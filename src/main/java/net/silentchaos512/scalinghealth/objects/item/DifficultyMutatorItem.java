@@ -22,11 +22,11 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.stats.Stats;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Rarity;
+import net.minecraft.world.item.Item.TooltipContext;
+import net.minecraft.world.item.component.TooltipDisplay;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
 import net.silentchaos512.scalinghealth.ScalingHealth;
@@ -39,7 +39,7 @@ import net.silentchaos512.scalinghealth.utils.config.SHDifficulty;
 import net.silentchaos512.scalinghealth.utils.config.SHItems;
 
 import javax.annotation.Nullable;
-import java.util.List;
+import java.util.function.Consumer;
 
 public class DifficultyMutatorItem extends Item {
     public enum Type {
@@ -85,31 +85,28 @@ public class DifficultyMutatorItem extends Item {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level world, List<Component> list, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, TooltipContext context, TooltipDisplay display,
+                                Consumer<Component> tooltip, TooltipFlag flag) {
+        Level world = context.level();
         double amount = getEffectAmount(world);
         if(this.type != Type.CHANCE) {
             String amountStr = (amount > 0 ? "+" : "") + String.format("%.1f", amount);
-            list.add(Component.translatable("item.scalinghealth.difficulty_changer.effectDesc", amountStr));
+            tooltip.accept(Component.translatable("item.scalinghealth.difficulty_changer.effectDesc", amountStr));
         }
         else
-            list.add(Component.translatable("item.scalinghealth.difficulty_changer.effectDesc", "?"));
+            tooltip.accept(Component.translatable("item.scalinghealth.difficulty_changer.effectDesc", "?"));
     }
 
     @Override
-    public Rarity getRarity(ItemStack stack) {
-        return Rarity.EPIC;
-    }
-
-    @Override
-    public InteractionResultHolder<ItemStack> use(Level world, Player player, InteractionHand hand) {
+    public InteractionResult use(Level world, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
         if(!EnabledFeatures.difficultyEnabled())
-            return new InteractionResultHolder<>(InteractionResult.FAIL, stack);
+            return InteractionResult.FAIL;
 
         IDifficultySource source = SHDifficulty.source(player);
 
         float change = (float) getEffectAmount(world);
-        if (!world.isClientSide) {
+        if (!world.isClientSide()) {
             source.addDifficulty(change);
             stack.shrink(1);
             player.awardStat(Stats.ITEM_USED.get(this));
@@ -119,30 +116,30 @@ public class DifficultyMutatorItem extends Item {
             // Enchanted Heart
             case ENCHANTED:
                 enchantedHeartEffects(world, player);
-                return new InteractionResultHolder<>(InteractionResult.SUCCESS, stack);
+                return InteractionResult.SUCCESS;
             // Cursed Heart
             case CURSED:
                 cursedHeartEffects(world, player);
-                return new InteractionResultHolder<>(InteractionResult.SUCCESS, stack);
+                return InteractionResult.SUCCESS;
             // Chance Heart
             case CHANCE:
                 chanceHeartEffects(world, player, (int) change);
-                return new InteractionResultHolder<>(InteractionResult.SUCCESS, stack);
+                return InteractionResult.SUCCESS;
             default:
                 ScalingHealth.LOGGER.error("DifficultyMutatorItem invalid type: {}", this.type);
-                return new InteractionResultHolder<>(InteractionResult.PASS, stack);
+                return InteractionResult.PASS;
         }
     }
 
     private void cursedHeartEffects(Level world, Player player) {
-        if(world.isClientSide) {
+        if(world.isClientSide()) {
             ParticleUtils.spawn(Registration.CURSED_HEART_PARTICLE.get(), 40, player);
             SoundUtils.play(player, Registration.CURSED_HEART_USE.get());
         }
     }
 
     private void enchantedHeartEffects(Level world, Player player) {
-        if(world.isClientSide) {
+        if(world.isClientSide()) {
             ParticleUtils.spawn(Registration.ENCHANTED_HEART_PARTICLE.get(), 40, player);
             SoundUtils.play(player, Registration.ENCHANTED_HEART_USE.get());
         }

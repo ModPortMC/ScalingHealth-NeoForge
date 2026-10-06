@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "group": "scalinghealth",
+  "key": {
+    "x": "minecraft:paper",
+    "y": "scalinghealth:heart_dust"
+  },
+  "pattern": [
+    "xxx",
+    "yyy"
+  ],
+  "result": {
+    "count": 2,
+    "id": "scalinghealth:bandages"
+  },
+  "show_notification": false
+}

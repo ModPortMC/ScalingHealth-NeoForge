@@ -1,13 +1,13 @@
 package net.silentchaos512.scalinghealth.datagen;
 
-import net.minecraft.data.DataGenerator;
-import net.minecraftforge.common.data.LanguageProvider;
+import net.minecraft.data.PackOutput;
+import net.neoforged.neoforge.common.data.LanguageProvider;
 import net.silentchaos512.scalinghealth.ScalingHealth;
 import net.silentchaos512.scalinghealth.objects.Registration;
 
 public class EnglishLocalization extends LanguageProvider {
-    public EnglishLocalization(DataGenerator gen) {
-        super(gen.getPackOutput(), ScalingHealth.MOD_ID, "en_us");
+    public EnglishLocalization(PackOutput output) {
+        super(output, ScalingHealth.MOD_ID, "en_us");
     }
 
     @Override
@@ -56,6 +56,7 @@ public class EnglishLocalization extends LanguageProvider {
         add(Registration.POWER_CRYSTAL_SHARD.get(), "Power Crystal Shard");
 
         noPost("itemGroup", "Scaling Health");
+        add("key.category", "main", "Scaling Health");
         add("key", "difficultyMeter", "Difficulty Meter Toggle");
         add("misc", "difficultyMeterText", "DIFFICULTY");
         add("misc", "sleepWarning", "[Scaling Health] Warning: Sleeping will change your difficulty.");

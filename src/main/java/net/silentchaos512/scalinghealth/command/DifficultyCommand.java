@@ -22,8 +22,8 @@ public final class DifficultyCommand {
     private DifficultyCommand() {}
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext buildContext) {
-        LiteralArgumentBuilder<CommandSourceStack> builder = Commands.literal("sh_difficulty").requires(source ->
-                source.hasPermission(2));
+        LiteralArgumentBuilder<CommandSourceStack> builder = Commands.literal("sh_difficulty")
+                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS));
 
         // get
         builder
@@ -118,7 +118,7 @@ public final class DifficultyCommand {
     }
 
     private static int runGetServerDifficulty(CommandContext<CommandSourceStack> context) {
-        IDifficultySource source = DifficultySourceCapability.getOverworldCap().orElseGet(DifficultySourceCapability::new);
+        IDifficultySource source = context.getSource().getServer().overworld().getData(DifficultySourceCapability.INSTANCE);
 
         // Difficulty
         double difficulty = source.getDifficulty();
@@ -140,7 +140,7 @@ public final class DifficultyCommand {
 
     private static int runSetServerDifficulty(CommandContext<CommandSourceStack> context) {
         float amount = FloatArgumentType.getFloat(context, "amount");
-        DifficultySourceCapability.getOverworldCap().orElseGet(DifficultySourceCapability::new).setDifficulty(amount);
+        context.getSource().getServer().overworld().getData(DifficultySourceCapability.INSTANCE).setDifficulty(amount);
         return 1;
     }
 
@@ -154,7 +154,7 @@ public final class DifficultyCommand {
 
     private static int runAddServerDifficulty(CommandContext<CommandSourceStack> context) {
         float amount = FloatArgumentType.getFloat(context, "amount");
-        DifficultySourceCapability.getOverworldCap().orElseGet(DifficultySourceCapability::new).addDifficulty(amount);
+        context.getSource().getServer().overworld().getData(DifficultySourceCapability.INSTANCE).addDifficulty(amount);
         return 1;
     }
 

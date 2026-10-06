@@ -1,257 +1,192 @@
-buildscript {
-    repositories {
-        maven { url = 'https://maven.minecraftforge.net/' }
-        mavenCentral()
-    }
-    dependencies {
-        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '6.0.+', changing: true
-    }
-}
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
 
 plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'net.neoforged.moddev' version '2.0.146'
     id 'idea'
     id 'eclipse'
-    id 'maven-publish'
-    id 'com.matthewprenger.cursegradle' version '1.4.0'
 }
 
-apply plugin: 'net.minecraftforge.gradle'
-
-repositories {
-    maven { url = 'https://maven.minecraftforge.net/' }
-    mavenLocal()
+base {
+    archivesName = project.archivesBaseName
 }
-
-archivesBaseName = project.archivesBaseName
 
 ext {
     VERSION_INFO = getModVersion()
     VERSION_SHORT = "${VERSION_INFO['version_short']}"
 }
 
-System.out.println(VERSION_INFO)
 version = "${VERSION_INFO['version']}"
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(17)
-
 println('Java: ' + System.getProperty('java.version') + ' JVM: ' + System.getProperty('java.vm.version') + '(' + System.getProperty('java.vendor') + ') Arch: ' + System.getProperty('os.arch'))
-minecraft {
-    accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
+println('NeoForge: ' + project.neo_version + ' Minecraft: ' + project.minecraft_version)
 
-    mappings channel: 'official', version: '1.20.1'
-    copyIdeResources = true
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+sourceSets.main.resources {
+    srcDir('src/generated/resources')
+}
+
+repositories {
+    maven {
+        name = 'CurseMaven'
+        url = uri('https://cursemaven.com')
+        content {
+            includeGroup 'curse.maven'
+        }
+    }
+    mavenLocal()
+    mavenCentral()
+}
+
+neoForge {
+    version = project.neo_version
 
     runs {
         client {
-            workingDirectory project.file('run')
-
-            //properties 'forge.logging.markers': 'SCAN,REGISTRIES,REGISTRYDUMP'
-            properties 'forge.logging.console.level': 'debug'
-            jvmArg("-Xmx6G")
-
-            mods { scalinghealth { source sourceSets.main} }
+            client()
+            jvmArguments.add('-Xmx6G')
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
         server {
-            workingDirectory project.file('run')
-
-            //properties 'forge.logging.markers': 'SCAN,REGISTRIES,REGISTRYDUMP'
-            properties 'forge.logging.console.level': 'debug'
-
-            mods { scalinghealth { source sourceSets.main} }
+            server()
+            programArgument '--nogui'
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
         data {
-            workingDirectory project.file('run')
+            clientData()
+            programArguments.addAll '--mod', project.mod_id, '--all', '--output',
+                    file('src/generated/resources/').getAbsolutePath(), '--existing',
+                    file('src/main/resources/').getAbsolutePath()
+        }
+        configureEach {
+            gameDirectory = project.file('run')
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            logLevel = org.slf4j.event.Level.DEBUG
+        }
+    }
 
-            properties 'forge.logging.console.level': 'debug'
-
-            args '--mod', 'scalinghealth', '--all', '--output', file('src/generated/resources/'), '--existing', sourceSets.main.resources.srcDirs[0]
-
-            mods { scalinghealth { source sourceSets.main} }
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
         }
     }
 }
 
-sourceSets.main.resources { srcDir 'src/generated/resources' }
-
-repositories {
-    mavenLocal()
-    mavenCentral() //Eval Ex
-    maven {
-        // location of the maven that hosts JEI files
-        name = "Progwml6 maven"
-        url = "https://dvs1.progwml6.com/files/maven/"
-    }
-    maven {
-        // location of a maven mirror for JEI files, as a fallback
-        name = "ModMaven"
-        url = "https://modmaven.k-4u.nl"
-    }
-    maven {
-        url "https://www.cursemaven.com"
-        content {
-            includeGroup "curse.maven"
-        }
-    }
+// ModDevGradle 2.x exposes the configured server as runServer. The host
+// verification command historically invokes runGameTestServer, so keep that
+// compatibility name as a lifecycle task backed by the real NeoForge task.
+tasks.register('runGameTestServer') {
+    group = 'neoforge'
+    description = 'Runs the NeoForge server with the configured game-test namespace enabled.'
+    dependsOn tasks.named('runServer')
 }
 
 configurations {
-    // Dependencies to pack into the jar
+    // Dependencies in this configuration are unpacked into the final jar.
     extraLibs
     implementation.extendsFrom extraLibs
 }
 
-//add it to the classpath manually. forgegradle + modules shenanigans
-minecraft.runs.all {
-    lazyToken('minecraft_classpath') {
-        configurations.extraLibs.copyRecursive().resolve().collect {it.absolutePath }.join(File.pathSeparator)
+dependencies {
+    // EvalEx remains shaded into the mod jar, matching the Forge build.
+    extraLibs 'com.udojava:EvalEx:2.1'
+
+    // Keep the selected Silent Lib file external to the mod jar. File 7936002 is
+    // Silent Lib 11.2.0 for NeoForge 26.1.x; its file ID is pinned in gradle.properties.
+    implementation "curse.maven:silent-lib-242998:${project.silentlib_curse_file_id}"
+}
+
+// Generate the final NeoForge descriptor from the locked project properties.
+tasks.withType(ProcessResources).configureEach {
+    def replaceProperties = [
+            minecraft_version      : project.minecraft_version,
+            minecraft_version_range: project.minecraft_version_range,
+            neo_version            : project.neo_version,
+            mod_id                 : project.mod_id,
+            mod_name               : project.mod_name,
+            mod_license            : project.mod_license,
+            mod_version            : project.version,
+            silentlib_version      : project.silentlib_version,
+    ]
+    inputs.properties replaceProperties
+    filesMatching(['META-INF/neoforge.mods.toml']) {
+        expand replaceProperties
     }
 }
 
-dependencies {
-    minecraft "net.minecraftforge:forge:${project.forge_version}"
-
-    extraLibs "com.udojava:EvalEx:2.1"
-
-//    compileOnly fg.deobf("mezz.jei:jei-${project.jei_version}:api")
-//    runtimeOnly fg.deobf("mezz.jei:jei-${project.jei_version}")
-
-    implementation fg.deobf("curse.maven:silentlib-242998:${project.sl_file}")
-//    implementation fg.deobf("curse.maven:configured-457570:3291560")
-
-    configurations.implementation.extendsFrom(configurations.extraLibs)
-}
-
-jar {
-    archiveAppendix = "${project.mc_version}"
+tasks.named('jar', Jar) {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    archiveAppendix = project.mc_version
     manifest {
-        attributes(["Specification-Title": project.mod_id,
-                    "Specification-Vendor": "SilentChaos512",
-                    "Specification-Version": "${VERSION_INFO['version_simple']}",
-                    "Implementation-Title": project.name,
-                    "Implementation-Version": "${version}",
-                    "Implementation-Vendor" :"SilentChaos512",
-                    "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")],)
+        attributes([
+                'Specification-Title'    : project.mod_id,
+                'Specification-Vendor'   : 'SilentChaos512',
+                'Specification-Version'  : "${VERSION_INFO['version_simple']}",
+                'Implementation-Title'   : project.name,
+                'Implementation-Version' : "${version}",
+                'Implementation-Vendor'  : 'SilentChaos512',
+                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+        ])
     }
     from {
         configurations.extraLibs.collect { it.isDirectory() ? it : zipTree(it) }
     }
 }
 
-task deobfJar(type: Jar) {
-    archiveAppendix = "${project.mc_version}"
+tasks.register('deobfJar', Jar) {
+    archiveAppendix = project.mc_version
     archiveClassifier = 'deobf'
     from sourceSets.main.output
 }
 
-task sourcesJar(type: Jar) {
-    archiveAppendix = "${project.mc_version}"
+tasks.register('sourcesJar', Jar) {
+    archiveAppendix = project.mc_version
     archiveClassifier = 'sources'
     from sourceSets.main.allJava
 }
 
-task javadocJar(type: Jar, dependsOn: javadoc) {
-    archiveAppendix = "${project.mc_version}"
+tasks.register('javadocJar', Jar) {
+    dependsOn tasks.named('javadoc')
+    archiveAppendix = project.mc_version
     archiveClassifier = 'javadoc'
-    from javadoc.getDestinationDir()
+    from tasks.named('javadoc').flatMap { it.destinationDirectory }
 }
 
 artifacts {
     if (project.hasProperty('doDeobfJar')) {
-        archives deobfJar
+        archives tasks.named('deobfJar')
     }
     if (project.hasProperty('doSourceJar')) {
-        archives sourcesJar
+        archives tasks.named('sourcesJar')
     }
     if (project.hasProperty('doJavadocJar')) {
-        archives javadocJar
+        archives tasks.named('javadocJar')
     }
 }
 
-task zipUserStartPack(type: Zip) {
+tasks.register('zipUserStartPack', Zip) {
     archiveBaseName = 'user_start_pack'
     archiveVersion = '2'
-
     destinationDirectory = file('build/zips')
-    from ('user_starter_pack')
+    from('user_starter_pack')
 }
 
-class Secrets {
-    def data = null
-    def getProperty(String key) {
-        return data ? data[key] : ''
-    }
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
 }
 
-import com.matthewprenger.cursegradle.CurseExtension
-import groovy.json.JsonSlurper
-
-def secretFile = file 'secret.json'
-
-project.ext.secret = new Secrets()
-if (secretFile.exists()) {
-    secretFile.withReader {
-        project.ext.secret.data = new JsonSlurper().parse it
-    }
-}
-
-curseforge {
-    if (project.hasProperty('cf_project_id') && project.hasProperty('cf_release_type') && project.hasProperty('cf_changelog_filename') &&
-            ((project.cf_release_type == 'alpha') || (project.cf_release_type == 'beta') || (project.cf_release_type == 'release'))) {
-        apiKey = secret.curseforgeAPIKey
-        project {
-            id = project.cf_project_id
-            addGameVersion(project.mc_version)
-            mainArtifact(jar) {
-                changelog = file(project.cf_changelog_filename)
-                changelogType = 'markdown'
-                releaseType = project.cf_release_type
-                relations {
-                    requiredDependency 'silent-lib'
-                    optionalDependency 'configured'
-                }
-            }
-//            addArtifact(zipUserStartPack) {
-//                releaseType = 'release'
-//            }
-        }
-        options {
-            debug = true
-        }
-    }
-}
-
-// Version stuff
+// A source ZIP or fork must build without depending on local Git tags.
 def getModVersion() {
-    return getGitVersion()
-}
-
-def getGitVersion() {
-    // Call git command
-    def proc = "git describe --long".execute();
-    proc.waitFor();
-    def fullVersion = proc.text.trim();
-
-    def matcher = fullVersion =~ /(\d+).(\d+).(\d+)-(.*)/
-
-    def maj = matcher[0][1]
-    def min = matcher[0][2]
-    def rev = matcher[0][3]
-    def bn = getBuildNumber()
-
-    return makeVersionMap(maj, min, rev, bn, matcher[0][4])
-}
-
-static def makeVersionMap(maj, min, rev, bn, githash) {
-    def out = [:]
-    out['build.major.number'] = maj.toString()
-    out['build.minor.number'] = min.toString()
-    out['build.revision.number'] = rev.toString()
-    out['build.githash'] = githash
-    out['build.number'] = bn.toString()
-    out['version_simple'] = "${maj}.${min}".toString()
-    out['version_short'] = "${maj}.${min}.${rev}".toString()
-    out['version'] = "${maj}.${min}.${rev}+${bn}".toString()
-    return out
+    def declaredVersion = project.mod_version.toString()
+    def parts = declaredVersion.tokenize('.')
+    return [
+            version_simple: "${parts[0]}.${parts[1]}".toString(),
+            version_short: declaredVersion,
+            version: "${declaredVersion}+${getBuildNumber()}".toString(),
+    ]
 }
 
 String getBuildNumber() {
@@ -261,56 +196,41 @@ String getBuildNumber() {
         versionProps.load(new FileInputStream(versionFile))
         return versionProps['build_number'].toString()
     }
-    return "1"
+    return '1'
 }
 
-task incrementBuild {
+tasks.register('incrementBuild') {
     doLast {
         def versionFile = file('version.properties')
         if (versionFile.canRead()) {
             Properties versionProps = new Properties()
             versionProps.load(new FileInputStream(versionFile))
             def num = versionProps['build_number'].toInteger() + 1
-            println("Incrementing BuildNumber to: " + num)
+            println('Incrementing BuildNumber to: ' + num)
             versionProps['build_number'] = num.toString()
             versionProps.store(versionFile.newWriter(), null)
         } else {
-            println("version.properties file not found! Ignoring.")
+            println('version.properties file not found! Ignoring.')
         }
     }
 }
 
-import groovy.json.JsonOutput
-
 def writeUpdateJson() {
-    def slurper = new JsonSlurper()
-    def file = new File('update.json')
-    def json = slurper.parse(file)
+    def updateFile = new File('update.json')
+    def json = new JsonSlurper().parse(updateFile)
 
-    if (!json[project.mc_version].containsKey(VERSION_SHORT))
+    if (!json[project.mc_version].containsKey(VERSION_SHORT)) {
         json[project.mc_version][VERSION_SHORT] = project.changelogUrl
-    json[project.mc_version] = json[project.mc_version].sort([compare: {a, b -> b.compareTo(a)}] as Comparator)
+    }
+    json[project.mc_version] = json[project.mc_version].sort([compare: { a, b -> b.compareTo(a) }] as Comparator)
     json['promos']["${project.mc_version}-latest"] = VERSION_SHORT
 
-    file.write(JsonOutput.prettyPrint(JsonOutput.toJson(json)))
+    updateFile.write(JsonOutput.prettyPrint(JsonOutput.toJson(json)))
 }
 
-task createUpdateJson {
+tasks.register('createUpdateJson') {
     doLast {
         println('Updating update.json...')
         writeUpdateJson()
-    }
-}
-
-tasks.configureEach { task ->
-    if (task.name == 'curseforge' + project.cf_project_id) {
-        if (!project.extensions.getByType(CurseExtension).curseGradleOptions.debug) {
-            task.finalizedBy {
-                incrementBuild
-            }
-        }
-        task.finalizedBy {
-            createUpdateJson
-        }
     }
 }

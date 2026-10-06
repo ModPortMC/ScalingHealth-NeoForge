@@ -17,12 +17,12 @@ import net.minecraft.commands.synchronization.SuggestionProviders;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.phys.Vec3;
 import net.silentchaos512.scalinghealth.capability.IDifficultyAffected;
 import net.silentchaos512.scalinghealth.utils.MobDifficultyHandler;
@@ -34,16 +34,16 @@ public final class SummonCommand {
     private SummonCommand() {}
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context) {
-        LiteralArgumentBuilder<CommandSourceStack> builder = Commands.literal("sh_summon").requires(source ->
-                source.hasPermission(2));
+        LiteralArgumentBuilder<CommandSourceStack> builder = Commands.literal("sh_summon")
+                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS));
 
         // blight summoning? setting difficulty?
         builder.then(Commands.argument("entity", ResourceArgument.resource(context, Registries.ENTITY_TYPE))
-                .suggests(SuggestionProviders.SUMMONABLE_ENTITIES)
+                .suggests(SuggestionProviders.cast(SuggestionProviders.SUMMONABLE_ENTITIES))
                 .executes(source ->
                         summonEntity(
                                 source.getSource(),
-                                ResourceArgument.getEntityType(source, "entity").key().location(),
+                                ResourceArgument.getEntityType(source, "entity").key().identifier(),
                                 -1,
                                 false,
                                 source.getSource().getPosition(),
@@ -55,7 +55,7 @@ public final class SummonCommand {
                         .executes(source ->
                                 summonEntity(
                                         source.getSource(),
-                                        ResourceArgument.getEntityType(source, "entity").key().location(),
+                                        ResourceArgument.getEntityType(source, "entity").key().identifier(),
                                         IntegerArgumentType.getInteger(source, "difficulty"),
                                         false,
                                         source.getSource().getPosition(),
@@ -67,7 +67,7 @@ public final class SummonCommand {
                                 .executes(source ->
                                         summonEntity(
                                                 source.getSource(),
-                                                ResourceArgument.getEntityType(source, "entity").key().location(),
+                                                ResourceArgument.getEntityType(source, "entity").key().identifier(),
                                                 IntegerArgumentType.getInteger(source, "difficulty"),
                                                 BoolArgumentType.getBool(source, "forceBlight"),
                                                 source.getSource().getPosition(),
@@ -79,7 +79,7 @@ public final class SummonCommand {
                                         .executes(source ->
                                                 summonEntity(
                                                         source.getSource(),
-                                                        ResourceArgument.getEntityType(source, "entity").key().location(),
+                                                        ResourceArgument.getEntityType(source, "entity").key().identifier(),
                                                         IntegerArgumentType.getInteger(source, "difficulty"),
                                                         BoolArgumentType.getBool(source, "forceBlight"),
                                                         Vec3Argument.getVec3(source, "pos"),
@@ -90,7 +90,8 @@ public final class SummonCommand {
                                                 .executes(source ->
                                                         summonEntity(
                                                                 source.getSource(),
-                                                                ResourceArgument.getEntityType(source, "entity").key().location(),                                                                IntegerArgumentType.getInteger(source, "difficulty"),
+                                                                ResourceArgument.getEntityType(source, "entity").key().identifier(),
+                                                                IntegerArgumentType.getInteger(source, "difficulty"),
                                                                 BoolArgumentType.getBool(source, "forceBlight"),
                                                                 Vec3Argument.getVec3(source, "pos"),
                                                                 CompoundTagArgument.getCompoundTag(source, "nbt"),
@@ -107,12 +108,12 @@ public final class SummonCommand {
     }
 
     // Mostly a copy of vanilla summon command
-    private static int summonEntity(CommandSourceStack source, ResourceLocation id, int difficulty, boolean forceBlight, Vec3 pos, CompoundTag tags, boolean randomizeProperties) throws CommandSyntaxException {
+    private static int summonEntity(CommandSourceStack source, Identifier id, int difficulty, boolean forceBlight, Vec3 pos, CompoundTag tags, boolean randomizeProperties) throws CommandSyntaxException {
         CompoundTag nbt = tags.copy();
         nbt.putString("id", id.toString());
         ServerLevel world = source.getLevel();
-        Entity entity = EntityType.loadEntityRecursive(nbt, world, e -> {
-            e.moveTo(pos.x, pos.y, pos.z, e.getYRot(), e.getXRot());
+        Entity entity = EntityType.loadEntityRecursive(nbt, world, EntitySpawnReason.COMMAND, e -> {
+            e.snapTo(pos.x, pos.y, pos.z, e.getYRot(), e.getXRot());
             //noinspection ReturnOfNull
             return !world.addWithUUID(e) ? null : e;
         });
@@ -121,7 +122,7 @@ public final class SummonCommand {
         } else {
             if (randomizeProperties && entity instanceof Mob) {
                 Mob mob = (Mob) entity;
-                mob.finalizeSpawn(world, world.getCurrentDifficultyAt(entity.blockPosition()), MobSpawnType.COMMAND, null, null);
+                mob.finalizeSpawn(world, world.getCurrentDifficultyAt(entity.blockPosition()), EntitySpawnReason.COMMAND, null);
 
                 if (difficulty > 0) {
                     IDifficultyAffected affected = SHDifficulty.affected(entity);

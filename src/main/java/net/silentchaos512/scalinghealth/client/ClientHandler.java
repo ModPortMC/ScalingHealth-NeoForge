@@ -2,16 +2,14 @@ package net.silentchaos512.scalinghealth.client;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraftforge.network.NetworkEvent;
 import net.silentchaos512.scalinghealth.ScalingHealth;
+import net.silentchaos512.scalinghealth.capability.DifficultySourceCapability;
 import net.silentchaos512.scalinghealth.network.ClientLoginMessage;
 import net.silentchaos512.scalinghealth.network.ClientSyncMessage;
 import net.silentchaos512.scalinghealth.utils.mode.AreaDifficultyMode;
 import net.silentchaos512.scalinghealth.utils.mode.AreaDifficultyModes;
 import org.apache.logging.log4j.Marker;
 import org.apache.logging.log4j.MarkerManager;
-
-import java.util.function.Supplier;
 
 /**
  * Handles information synced from the server. Only information actually needed by the client should
@@ -21,6 +19,7 @@ public final class ClientHandler {
     private static final Marker MARKER = MarkerManager.getMarker("ClientHandler");
     // Frequent updates (up to once per second)
     public static float playerDifficulty;
+    public static float worldDifficulty;
     public static float areaDifficulty;
     public static int regenTimer;
     public static int locationMultiPercent;
@@ -30,8 +29,10 @@ public final class ClientHandler {
 
     private ClientHandler() {}
 
-    public static void handleSyncMessage(ClientSyncMessage msg, Supplier<NetworkEvent.Context> ctx) {
+    public static void handleSyncMessage(ClientSyncMessage msg) {
         playerDifficulty = msg.playerDifficulty;
+        worldDifficulty = msg.worldDifficulty;
+        DifficultySourceCapability.setClientWorldDifficulty(msg.worldDifficulty);
         areaDifficulty = msg.areaDifficulty;
         regenTimer = msg.regenTimer;
         locationMultiPercent = msg.locationMultiPercent;
@@ -43,7 +44,7 @@ public final class ClientHandler {
         }
     }
 
-    public static void handleLoginMessage(ClientLoginMessage msg, Supplier<NetworkEvent.Context> ctx) {
+    public static void handleLoginMessage(ClientLoginMessage msg) {
         ScalingHealth.LOGGER.info(MARKER, "Processing login packet");
         areaMode = msg.areaMode;
         maxDifficultyValue = msg.maxDifficultyValue;

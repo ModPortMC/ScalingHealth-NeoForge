@@ -1,25 +1,41 @@
 package net.silentchaos512.scalinghealth.loot.conditions;
 
-import com.google.gson.JsonDeserializationContext;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonSerializationContext;
-import net.minecraft.core.Registry;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.GsonHelper;
+import com.mojang.datafixers.util.Either;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.storage.loot.LootContext;
-import net.minecraft.world.level.storage.loot.Serializer;
 import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
-import net.minecraft.world.level.storage.loot.predicates.LootItemConditionType;
 import net.silentchaos512.scalinghealth.ScalingHealth;
 import net.silentchaos512.scalinghealth.capability.IDifficultyAffected;
-import net.silentchaos512.scalinghealth.objects.Registration;
 import net.silentchaos512.scalinghealth.utils.config.SHDifficulty;
 
 public class SHMobProperties implements LootItemCondition {
-    public static final ResourceLocation NAME = new ResourceLocation(ScalingHealth.MOD_ID, "mob_properties");
+    public static final Identifier NAME = ScalingHealth.getId("mob_properties");
+
+    private record DifficultyRange(float min, float max) {}
+
+    private static final Codec<DifficultyRange> DIFFICULTY_RANGE_CODEC = Codec.<DifficultyRange, Float>either(
+            RecordCodecBuilder.<DifficultyRange>create(instance -> instance.group(
+                    Codec.FLOAT.optionalFieldOf("min", 0f).forGetter(DifficultyRange::min),
+                    Codec.FLOAT.optionalFieldOf("max", Float.MAX_VALUE).forGetter(DifficultyRange::max)
+            ).apply(instance, DifficultyRange::new)),
+            Codec.FLOAT
+    ).xmap(
+            value -> value.map(range -> range, scalar -> new DifficultyRange(scalar, scalar)),
+            range -> range.min() == range.max() ? Either.right(range.min()) : Either.left(range)
+    );
+
+    public static final MapCodec<SHMobProperties> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+            LootContext.EntityTarget.CODEC.fieldOf("entity").forGetter(condition -> condition.target),
+            Codec.BOOL.optionalFieldOf("is_blight", false).forGetter(condition -> condition.isBlight),
+            DIFFICULTY_RANGE_CODEC.optionalFieldOf("difficulty", new DifficultyRange(0, Float.MAX_VALUE))
+                    .forGetter(condition -> new DifficultyRange(condition.minDifficulty, condition.maxDifficulty))
+    ).apply(instance, (target, isBlight, range) ->
+            new SHMobProperties(target, isBlight, range.min(), range.max())));
 
     private final LootContext.EntityTarget target;
     private final boolean isBlight;
@@ -33,57 +49,25 @@ public class SHMobProperties implements LootItemCondition {
         this.maxDifficulty = maxDifficulty;
     }
 
-    public static LootItemCondition.Builder builder(LootContext.EntityTarget target, boolean isBlight, float minDifficulty, float maxDifficulty){
+    public static LootItemCondition.Builder builder(LootContext.EntityTarget target, boolean isBlight, float minDifficulty, float maxDifficulty) {
         return () -> new SHMobProperties(target, isBlight, minDifficulty, maxDifficulty);
     }
 
     @Override
-    public LootItemConditionType getType() {
-        return Registration.MOB_PROPERTIES.get();
+    public MapCodec<SHMobProperties> codec() {
+        return CODEC;
     }
 
     @Override
     public boolean test(LootContext lootContext) {
-        Entity entity = lootContext.getParamOrNull(this.target.getParam());
+        Entity entity = lootContext.getOptionalParameter(this.target.contextParam());
         if (entity instanceof Mob) {
             IDifficultyAffected affected = SHDifficulty.affected(entity);
-            //rare case where its prob better to get the non-blight difficulty
             float difficulty = affected.getDifficulty();
-            return difficulty >= this.minDifficulty &&
-                    difficulty <= this.maxDifficulty &&
-                    (!this.isBlight || affected.isBlight());
+            return difficulty >= this.minDifficulty
+                    && difficulty <= this.maxDifficulty
+                    && (!this.isBlight || affected.isBlight());
         }
         return false;
-    }
-
-    public static class ThisSerializer implements Serializer<SHMobProperties> {
-        @Override
-        public void serialize(JsonObject json, SHMobProperties value, JsonSerializationContext context) {
-            json.add("entity", context.serialize(value.target));
-            json.addProperty("is_blight", value.isBlight);
-            JsonObject difficultyObj = new JsonObject();
-            difficultyObj.addProperty("min", value.minDifficulty);
-            difficultyObj.addProperty("max", value.maxDifficulty);
-            json.add("difficulty", difficultyObj);
-        }
-
-        @Override
-        public SHMobProperties deserialize(JsonObject json, JsonDeserializationContext context) {
-            LootContext.EntityTarget target = GsonHelper.getAsObject(json, "entity", context, LootContext.EntityTarget.class);
-            boolean isBlight = GsonHelper.getAsBoolean(json, "is_blight", false);
-            float minDifficulty = 0;
-            float maxDifficulty = Float.MAX_VALUE;
-            if (json.has("difficulty")) {
-                JsonElement difficulty = json.get("difficulty");
-                if (difficulty.isJsonObject()) {
-                    JsonObject jsonObject = difficulty.getAsJsonObject();
-                    minDifficulty = GsonHelper.getAsFloat(jsonObject, "min", minDifficulty);
-                    maxDifficulty = GsonHelper.getAsFloat(jsonObject, "max", maxDifficulty);
-                } else {
-                    minDifficulty = maxDifficulty = difficulty.getAsFloat();
-                }
-            }
-            return new SHMobProperties(target, isBlight, minDifficulty, maxDifficulty);
-        }
     }
 }

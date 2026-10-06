@@ -4,10 +4,9 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.network.NetworkDirection;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.silentchaos512.scalinghealth.event.PlayerBonusRegenHandler;
 import net.silentchaos512.scalinghealth.network.ClientSyncMessage;
-import net.silentchaos512.scalinghealth.network.Network;
 import net.silentchaos512.scalinghealth.utils.config.SHDifficulty;
 import net.silentchaos512.scalinghealth.utils.config.SHItems;
 import net.silentchaos512.scalinghealth.utils.config.SHPlayers;
@@ -58,7 +57,7 @@ public interface IPlayerData {
                 SHDifficulty.locationMultiplier(world, pos),
                 player.experienceLevel
         );
-        ServerPlayer playerMP = (ServerPlayer) player;
-        Network.channel.sendTo(msg, playerMP.connection.connection, NetworkDirection.PLAY_TO_CLIENT);
+        if (player instanceof ServerPlayer serverPlayer)
+            PacketDistributor.sendToPlayer(serverPlayer, msg);
     }
 }

@@ -21,25 +21,24 @@ package net.silentchaos512.scalinghealth.event;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.TamableAnimal;
-import net.minecraftforge.event.entity.living.LivingEvent;
-import net.minecraftforge.event.entity.player.PlayerInteractEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import net.neoforged.neoforge.event.tick.EntityTickEvent;
 import net.silentchaos512.scalinghealth.ScalingHealth;
 import net.silentchaos512.scalinghealth.objects.item.HeartCrystal;
 import net.silentchaos512.scalinghealth.resources.mechanics.SHMechanics;
 import net.silentchaos512.scalinghealth.utils.config.EnabledFeatures;
 
-@Mod.EventBusSubscriber(modid = ScalingHealth.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@EventBusSubscriber(modid = ScalingHealth.MOD_ID)
 public class PetEventHandler {
     @SubscribeEvent
-    public static void onLivingUpdate(LivingEvent.LivingTickEvent event) {
+    public static void onLivingUpdate(EntityTickEvent.Pre event) {
         double regenDelay = SHMechanics.getMechanics().mobMechanics().pets().petsRegenDelay();
         if (regenDelay <= 0)
             return;
 
-        LivingEntity entity = event.getEntity();
-        if (entity != null && !entity.level().isClientSide) {
+        if (event.getEntity() instanceof LivingEntity entity && !entity.level().isClientSide()) {
             boolean fullHp = entity.getHealth() == entity.getMaxHealth();
             boolean isTamed = entity instanceof TamableAnimal && ((TamableAnimal) entity).isTame();
             boolean isRegenTime = entity.invulnerableTime <= 0 && entity.tickCount % regenDelay == 0;
@@ -59,13 +58,14 @@ public class PetEventHandler {
         if(!pet.isTame())
             return;
 
-        if(pet.level().isClientSide) {
-            event.setCancellationResult(InteractionResult.SUCCESS);
+        event.setCancellationResult(InteractionResult.SUCCESS);
+        if(pet.level().isClientSide()) {
             event.setCanceled(true);
             return;
         }
 
         HeartCrystal heart = (HeartCrystal) event.getItemStack().getItem();
         heart.increasePetHp(event.getEntity(), pet, event.getItemStack());
+        event.setCanceled(true);
     }
 }

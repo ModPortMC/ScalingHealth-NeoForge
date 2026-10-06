@@ -27,21 +27,20 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.player.Player;
-import net.minecraftforge.event.entity.living.LivingDeathEvent;
-import net.minecraftforge.event.entity.living.LivingEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.network.NetworkDirection;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.tick.EntityTickEvent;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.silentchaos512.scalinghealth.ScalingHealth;
 import net.silentchaos512.scalinghealth.network.ClientBlightMessage;
-import net.silentchaos512.scalinghealth.network.Network;
 import net.silentchaos512.scalinghealth.resources.mechanics.SHMechanics;
 import net.silentchaos512.scalinghealth.utils.config.SHDifficulty;
 import net.silentchaos512.scalinghealth.utils.config.SHMobs;
 
-@Mod.EventBusSubscriber(modid = ScalingHealth.MOD_ID)
+@EventBusSubscriber(modid = ScalingHealth.MOD_ID)
 public final class BlightHandler {
     private BlightHandler() {}
 
@@ -94,7 +93,7 @@ public final class BlightHandler {
         if(!(event.getEntity() instanceof Mob)) return;
 
         Mob blight = (Mob) event.getEntity();
-        if (event.getSource() == null || !SHMobs.isBlight(blight) || event.getEntity().level().isClientSide)
+        if (event.getSource() == null || !SHMobs.isBlight(blight) || event.getEntity().level().isClientSide())
             return;
 
         Entity entitySource = event.getSource().getEntity();
@@ -131,16 +130,16 @@ public final class BlightHandler {
             if(SHDifficulty.affected(mob).isBlight()) {
                 ServerPlayer sp = (ServerPlayer) event.getEntity();
                 ClientBlightMessage msg = new ClientBlightMessage(mob.getId());
-                Network.channel.sendTo(msg, sp.connection.connection, NetworkDirection.PLAY_TO_CLIENT);
+                PacketDistributor.sendToPlayer(sp, msg);
             }
         }
     }
 
     @SubscribeEvent
-    public static void onBlightUpdate(LivingEvent.LivingTickEvent event) {
-        LivingEntity blight = event.getEntity();
-        if (!blight.level().isClientSide && blight instanceof Mob && SHMobs.isBlight((Mob) blight) && blight.level().getGameTime() % 1000 == 0) {
-            applyBlightPotionEffects((Mob) blight);
+    public static void onBlightUpdate(EntityTickEvent.Pre event) {
+        if (event.getEntity() instanceof LivingEntity blight && !blight.level().isClientSide()
+                && blight instanceof Mob mob && SHMobs.isBlight(mob) && blight.level().getGameTime() % 1000 == 0) {
+            applyBlightPotionEffects(mob);
         }
     }
 }

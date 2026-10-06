@@ -2,22 +2,21 @@ package net.silentchaos512.scalinghealth.utils.mode;
 
 import com.google.common.collect.ImmutableMap;
 import com.mojang.serialization.Codec;
-import net.minecraft.Util;
+import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 
 import java.util.Map;
 
 public abstract class AreaDifficultyMode {
-    private static final Map<String, Codec<? extends AreaDifficultyMode>> CODECS = Util.make(() ->
-            ImmutableMap.<String, Codec<? extends AreaDifficultyMode>>builder()
-                    .put("average", AreaDifficultyModes.Average.CODEC)
-                    .put("extrema", AreaDifficultyModes.Extrema.CODEC)
-                    .put("distance", AreaDifficultyModes.Distance.CODEC)
-                    .put("distance_and_time", AreaDifficultyModes.DistanceAndTime.CODEC)
-                    .put("server_wide", AreaDifficultyModes.ServerWide.CODEC)
-                    .build()
-    );
+    private static final Map<String, MapCodec<? extends AreaDifficultyMode>> CODECS =
+            ImmutableMap.<String, MapCodec<? extends AreaDifficultyMode>>builder()
+                    .put("average", AreaDifficultyModes.Average.MAP_CODEC)
+                    .put("extrema", AreaDifficultyModes.Extrema.MAP_CODEC)
+                    .put("distance", AreaDifficultyModes.Distance.MAP_CODEC)
+                    .put("distance_and_time", AreaDifficultyModes.DistanceAndTime.MAP_CODEC)
+                    .put("server_wide", AreaDifficultyModes.ServerWide.MAP_CODEC)
+                    .build();
 
     public static final Codec<AreaDifficultyMode> CODEC = Codec.STRING
             .dispatch(AreaDifficultyMode::getName, CODECS::get);

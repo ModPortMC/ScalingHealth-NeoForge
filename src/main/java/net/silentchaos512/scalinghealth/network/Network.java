@@ -1,47 +1,30 @@
 package net.silentchaos512.scalinghealth.network;
 
-import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.network.NetworkRegistry;
-import net.minecraftforge.network.simple.SimpleChannel;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import net.silentchaos512.scalinghealth.ScalingHealth;
-import net.silentchaos512.scalinghealth.client.ClientHandler;
 
-import java.util.Objects;
-
+/** Registration for Scaling Health's play-phase, server-to-client payloads. */
+@EventBusSubscriber(modid = ScalingHealth.MOD_ID)
 public final class Network {
-    private static final ResourceLocation NAME = ScalingHealth.getId("network");
+    private static final String PROTOCOL_VERSION = "3";
 
-    public static SimpleChannel channel;
+    private Network() {}
 
-    public static void init() {
-        channel = NetworkRegistry.ChannelBuilder.named(NAME)
-                .clientAcceptedVersions(s -> Objects.equals(s, "3"))
-                .serverAcceptedVersions(s -> Objects.equals(s, "3"))
-                .networkProtocolVersion(() -> "3")
-                .simpleChannel();
+    /**
+     * Kept for source compatibility with the mod constructor. Payloads are now
+     * registered through {@link RegisterPayloadHandlersEvent} on the mod bus.
+     */
+    public static void init() {}
 
-        channel.messageBuilder(ClientSyncMessage.class, 1)
-                .decoder(ClientSyncMessage::fromBytes)
-                .encoder(ClientSyncMessage::toBytes)
-                .consumerMainThread(ClientHandler::handleSyncMessage)
-                .add();
-
-        channel.messageBuilder(ClientLoginMessage.class, 2)
-                .decoder(ClientLoginMessage::fromBytes)
-                .encoder(ClientLoginMessage::toBytes)
-                .consumerMainThread(ClientHandler::handleLoginMessage)
-                .add();
-
-        channel.messageBuilder(ClientBlightMessage.class, 3)
-                .decoder(ClientBlightMessage::decode)
-                .encoder(ClientBlightMessage::encode)
-                .consumerMainThread(ClientBlightMessage::handle)
-                .add();
-
-        channel.messageBuilder(SHMechanicsPacket.class, 4)
-                .decoder(SHMechanicsPacket::decode)
-                .encoder(SHMechanicsPacket::encode)
-                .consumerMainThread(SHMechanicsPacket::handle) //TODO NETWORK THREAD?
-                .add();
+    @SubscribeEvent
+    public static void registerPayloads(RegisterPayloadHandlersEvent event) {
+        PayloadRegistrar registrar = event.registrar(PROTOCOL_VERSION);
+        registrar.playToClient(ClientSyncMessage.TYPE, ClientSyncMessage.CODEC);
+        registrar.playToClient(ClientLoginMessage.TYPE, ClientLoginMessage.CODEC);
+        registrar.playToClient(ClientBlightMessage.TYPE, ClientBlightMessage.CODEC);
+        registrar.playToClient(SHMechanicsPacket.TYPE, SHMechanicsPacket.CODEC);
     }
 }

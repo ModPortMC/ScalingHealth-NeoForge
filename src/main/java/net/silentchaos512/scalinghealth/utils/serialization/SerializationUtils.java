@@ -8,39 +8,55 @@ import com.udojava.evalex.Expression;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.silentchaos512.scalinghealth.config.EvalVars;
 
-import java.util.Arrays;
 import java.util.Locale;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 public class SerializationUtils {
-    public static final Codec<Supplier<Expression>> EXPRESSION_CODEC = Codec.STRING.comapFlatMap(s ->
-            {
-                if(s.isEmpty())
-                    return DataResult.error(() -> "Empty Expression");
+    public static final Codec<Supplier<Expression>> EXPRESSION_CODEC = Codec.STRING.flatXmap(
+            SerializationUtils::decodeExpression,
+            SerializationUtils::encodeExpression
+    );
 
-                Expression dummy = EvalVars.dummyPopulate(new Expression(s));
-                try {
-                    dummy.eval();
-                } catch (Exception e) {
-                    return DataResult.error(() -> "Could not parse Expression: " + e);
-                }
-                return DataResult.success(() -> new Expression(s));
-            }, e -> e.get().getExpression());
+    private static DataResult<String> encodeExpression(Supplier<Expression> expression) {
+        try {
+            return DataResult.success(expression.get().getExpression());
+        } catch (RuntimeException e) {
+            return DataResult.error(() -> "Could not encode Expression: " + e);
+        }
+    }
+
+    private static DataResult<Supplier<Expression>> decodeExpression(String source) {
+        if (source.isEmpty())
+            return DataResult.error(() -> "Empty Expression");
+
+        try {
+            Expression expression = EvalVars.dummyPopulate(new Expression(source));
+            expression.eval();
+        } catch (Exception e) {
+            return DataResult.error(() -> "Could not parse Expression: " + e);
+        }
+        return DataResult.success(() -> new Expression(source));
+    }
 
     public static final Codec<AttributeModifier.Operation> ATTRIBUTE_OPERATION_CODEC = Codec.STRING
             .comapFlatMap(s -> {
-                try {
-                    AttributeModifier.Operation op = AttributeModifier.Operation.valueOf(s.toUpperCase(Locale.ROOT));
-                    return DataResult.success(op);
-                } catch (Exception e) {
-                    return DataResult.error(() -> "No Operation named: " + s + ". Valid values are :" +
-                            Arrays.stream(AttributeModifier.Operation.values())
-                                    .map(Enum::name)
-                                    .collect(Collectors.joining(", ")));
-                }
-            }, AttributeModifier.Operation::name);
+                AttributeModifier.Operation op = switch (s.toUpperCase(Locale.ROOT)) {
+                    // Accept both the source-version JSON names and the target enum names.
+                    case "ADDITION", "ADD_VALUE" -> AttributeModifier.Operation.ADD_VALUE;
+                    case "MULTIPLY_BASE", "ADD_MULTIPLIED_BASE" -> AttributeModifier.Operation.ADD_MULTIPLIED_BASE;
+                    case "MULTIPLY_TOTAL", "ADD_MULTIPLIED_TOTAL" -> AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL;
+                    default -> null;
+                };
+                return op != null
+                        ? DataResult.success(op)
+                        : DataResult.error(() -> "No Operation named: " + s + ". Valid values are: ADDITION, MULTIPLY_BASE, MULTIPLY_TOTAL, ADD_VALUE, ADD_MULTIPLIED_BASE, ADD_MULTIPLIED_TOTAL");
+            }, op -> switch (op) {
+                // Keep serialized mechanics data readable by source-version consumers.
+                case ADD_VALUE -> "ADDITION";
+                case ADD_MULTIPLIED_BASE -> "MULTIPLY_BASE";
+                case ADD_MULTIPLIED_TOTAL -> "MULTIPLY_TOTAL";
+            });
 
     public static Codec<Integer> positiveInt() {
         return positiveInt(0);

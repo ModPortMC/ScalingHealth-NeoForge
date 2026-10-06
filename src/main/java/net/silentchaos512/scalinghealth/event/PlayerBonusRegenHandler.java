@@ -18,18 +18,18 @@
 
 package net.silentchaos512.scalinghealth.event;
 
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.gamerules.GameRules;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.LogicalSide;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.silentchaos512.scalinghealth.ScalingHealth;
 import net.silentchaos512.scalinghealth.resources.mechanics.PlayerMechanics;
 import net.silentchaos512.scalinghealth.resources.mechanics.SHMechanics;
@@ -38,7 +38,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-@Mod.EventBusSubscriber(modid = ScalingHealth.MOD_ID)
+@EventBusSubscriber(modid = ScalingHealth.MOD_ID)
 public final class PlayerBonusRegenHandler {
     private static final Map<UUID, Integer> TIMERS = new HashMap<>();
 
@@ -52,10 +52,17 @@ public final class PlayerBonusRegenHandler {
     }
 
     @SubscribeEvent
-    public static void onPlayerTick(TickEvent.PlayerTickEvent event) {
-        if (event.side == LogicalSide.CLIENT) return;
+    public static void onPlayerTickPre(PlayerTickEvent.Pre event) {
+        tickPlayer(event.getEntity());
+    }
 
-        Player player = event.player;
+    @SubscribeEvent
+    public static void onPlayerTickPost(PlayerTickEvent.Post event) {
+        tickPlayer(event.getEntity());
+    }
+
+    private static void tickPlayer(Player player) {
+        if (player.level().isClientSide()) return;
         if (isDisabled(player.level()))
             return;
 
@@ -81,12 +88,12 @@ public final class PlayerBonusRegenHandler {
     }
 
     @SubscribeEvent
-    public static void onPlayerHurt(LivingHurtEvent event) {
+    public static void onPlayerHurt(LivingIncomingDamageEvent event) {
         LivingEntity entity = event.getEntity();
         if (isDisabled(entity.level()))
             return;
 
-        if (!entity.level().isClientSide && entity instanceof Player) {
+        if (!entity.level().isClientSide() && entity instanceof Player) {
             TIMERS.put(entity.getUUID(), (int) (SHMechanics.getMechanics().playerMechanics().regenMechanics.initialDelay * 20));
         }
     }
@@ -95,7 +102,7 @@ public final class PlayerBonusRegenHandler {
         if (SHMechanics.getMechanics().playerMechanics().regenMechanics.proportionaltoMaxHp) {
             AttributeInstance attr = entity.getAttribute(Attributes.MAX_HEALTH);
             if (attr == null) {
-                ScalingHealth.LOGGER.warn("LivingEntity {} does not have a max hp attribute!", ForgeRegistries.ENTITY_TYPES.getKey(entity.getType()));
+                ScalingHealth.LOGGER.warn("LivingEntity {} does not have a max hp attribute!", BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()));
                 return 0;
             }
             double base = attr.getBaseValue();
@@ -123,6 +130,7 @@ public final class PlayerBonusRegenHandler {
     }
 
     private static boolean isDisabled(Level level) {
-        return !level.getGameRules().getBoolean(GameRules.RULE_NATURAL_REGENERATION);
+        return level instanceof ServerLevel serverLevel
+                && !serverLevel.getGameRules().get(GameRules.NATURAL_HEALTH_REGENERATION);
     }
 }

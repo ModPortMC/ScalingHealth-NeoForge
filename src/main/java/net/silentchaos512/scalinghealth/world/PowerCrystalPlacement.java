@@ -1,6 +1,6 @@
 package net.silentchaos512.scalinghealth.world;
 
-import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.levelgen.placement.PlacementContext;
@@ -11,7 +11,7 @@ import net.silentchaos512.scalinghealth.utils.config.EnabledFeatures;
 
 public class PowerCrystalPlacement extends PlacementFilter {
     public static final PowerCrystalPlacement INSTANCE = new PowerCrystalPlacement();
-    public static final Codec<PowerCrystalPlacement> CODEC = Codec.unit(() -> INSTANCE);
+    public static final MapCodec<PowerCrystalPlacement> CODEC = MapCodec.unit(INSTANCE);
 
     private PowerCrystalPlacement() {}
 

@@ -10,13 +10,13 @@ import java.util.function.Supplier;
 public class PlayerMechanics {
     public static final String FILE = "player";
 
-    public static final Codec<PlayerMechanics> CODEC = RecordCodecBuilder.create(inst ->
+    public static final Codec<PlayerMechanics> CODEC = RecordCodecBuilder.<PlayerMechanics>create(inst ->
             inst.group(
                     SerializationUtils.numberConstraintCodec(
                             SerializationUtils.positiveInt(1), "startingHealth",
                             SerializationUtils.positiveInt(1), "minHealth",
                             SerializationUtils.positiveInt(), "maxHealth"
-                    ).forGetter(p -> new SerializationUtils.NumberConstraint<>(p.startingHp, p.minHealth, p.maxHealth)),
+                    ).forGetter((PlayerMechanics p) -> new SerializationUtils.NumberConstraint<Integer, Integer, Integer>(p.startingHp, p.minHealth, p.maxHealth)),
                     SerializationUtils.EXPRESSION_CODEC.fieldOf("setOnDeath").forGetter(p -> p.healthOnDeath),
                     SerializationUtils.positiveDouble().fieldOf("maxAttackDamage").forGetter(p -> p.maxAttackDamage),
                     SerializationUtils.positiveInt(0).fieldOf("levelsPerHp").forGetter(p -> p.levelsPerHp),

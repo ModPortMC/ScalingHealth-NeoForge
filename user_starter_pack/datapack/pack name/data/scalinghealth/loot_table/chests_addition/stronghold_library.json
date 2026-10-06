@@ -1,0 +1,97 @@
+{
+  "pools": [
+    {
+      "rolls": 1.0,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "weight": 3,
+          "quality": 2,
+          "functions": [
+            {
+              "function": "minecraft:set_count",
+              "count": {
+                "min": 1.0,
+                "max": 2.0,
+                "type": "minecraft:uniform"
+              },
+              "add": false
+            }
+          ],
+          "name": "scalinghealth:heart_crystal"
+        },
+        {
+          "type": "minecraft:item",
+          "quality": 5,
+          "functions": [
+            {
+              "function": "minecraft:set_count",
+              "count": {
+                "min": 1.0,
+                "max": 3.0,
+                "type": "minecraft:uniform"
+              },
+              "add": false
+            }
+          ],
+          "name": "scalinghealth:cursed_heart"
+        },
+        {
+          "type": "minecraft:item",
+          "quality": 5,
+          "functions": [
+            {
+              "function": "minecraft:set_count",
+              "count": {
+                "min": 1.0,
+                "max": 3.0,
+                "type": "minecraft:uniform"
+              },
+              "add": false
+            }
+          ],
+          "name": "scalinghealth:enchanted_heart"
+        },
+        {
+          "type": "minecraft:item",
+          "quality": 5,
+          "functions": [
+            {
+              "function": "minecraft:set_count",
+              "count": {
+                "min": 1.0,
+                "max": 3.0,
+                "type": "minecraft:uniform"
+              },
+              "add": false
+            }
+          ],
+          "name": "scalinghealth:chance_heart"
+        },
+        {
+          "type": "minecraft:item",
+          "weight": 2,
+          "quality": 7,
+          "functions": [
+            {
+              "function": "minecraft:set_count",
+              "count": {
+                "min": 1.0,
+                "max": 2.0,
+                "type": "minecraft:uniform"
+              },
+              "add": false
+            }
+          ],
+          "name": "scalinghealth:power_crystal"
+        },
+        {
+          "type": "minecraft:empty",
+          "weight": 10
+        }
+      ],
+      "bonus_rolls": 0.0
+    }
+  ],
+  "random_sequence": "scalinghealth:chests_addition/stronghold_library"
+}

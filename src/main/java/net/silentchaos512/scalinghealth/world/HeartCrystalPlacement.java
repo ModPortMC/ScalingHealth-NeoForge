@@ -1,6 +1,6 @@
 package net.silentchaos512.scalinghealth.world;
 
-import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.levelgen.placement.PlacementContext;
@@ -11,7 +11,7 @@ import net.silentchaos512.scalinghealth.utils.config.EnabledFeatures;
 
 public class HeartCrystalPlacement extends PlacementFilter {
     public static final HeartCrystalPlacement INSTANCE = new HeartCrystalPlacement();
-    public static final Codec<HeartCrystalPlacement> CODEC = Codec.unit(() -> INSTANCE);
+    public static final MapCodec<HeartCrystalPlacement> CODEC = MapCodec.unit(INSTANCE);
 
     private HeartCrystalPlacement() {}
 

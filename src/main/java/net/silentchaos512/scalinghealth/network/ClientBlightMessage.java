@@ -1,15 +1,18 @@
 package net.silentchaos512.scalinghealth.network;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.Mob;
-import net.minecraftforge.network.NetworkEvent;
-import net.silentchaos512.scalinghealth.utils.config.SHDifficulty;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
+import net.silentchaos512.scalinghealth.ScalingHealth;
 
-import java.util.function.Supplier;
+public class ClientBlightMessage implements CustomPacketPayload {
+    public static final Type<ClientBlightMessage> TYPE = new Type<>(Identifier.fromNamespaceAndPath(ScalingHealth.MOD_ID, "client_blight"));
+    public static final StreamCodec<FriendlyByteBuf, ClientBlightMessage> CODEC = StreamCodec.ofMember(
+            ClientBlightMessage::encode,
+            ClientBlightMessage::decode
+    );
 
-public class ClientBlightMessage {
     public int entityId;
 
     public ClientBlightMessage(int parent) {
@@ -24,9 +27,9 @@ public class ClientBlightMessage {
         return new ClientBlightMessage(buffer.readInt());
     }
 
-    public static void handle(ClientBlightMessage msg, Supplier<NetworkEvent.Context> ctx) {
-        Entity e = Minecraft.getInstance().level.getEntity(msg.entityId);
-        if(e instanceof Mob)
-            SHDifficulty.affected(e).setIsBlight(true);
+    @Override
+    public Type<ClientBlightMessage> type() {
+        return TYPE;
     }
+
 }

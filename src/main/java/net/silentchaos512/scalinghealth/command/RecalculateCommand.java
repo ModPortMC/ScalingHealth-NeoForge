@@ -16,8 +16,8 @@ public final class RecalculateCommand {
     private RecalculateCommand() {}
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext buildContext) {
-        dispatcher.register(Commands.literal("sh_recalculate").requires(source ->
-                source.hasPermission(2))
+        dispatcher.register(Commands.literal("sh_recalculate")
+                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(Commands.literal("all")
                         .executes(context -> {
                             context.getSource().sendSuccess(() -> Component.translatable("command.scalinghealth.recalculate.start"), true);

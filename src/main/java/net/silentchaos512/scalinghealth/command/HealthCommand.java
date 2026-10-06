@@ -22,8 +22,8 @@ public final class HealthCommand {
     private HealthCommand() {}
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext buildContext) {
-        LiteralArgumentBuilder<CommandSourceStack> builder = Commands.literal("sh_health").requires(source ->
-                source.hasPermission(2));
+        LiteralArgumentBuilder<CommandSourceStack> builder = Commands.literal("sh_health")
+                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS));
 
         // get
         builder

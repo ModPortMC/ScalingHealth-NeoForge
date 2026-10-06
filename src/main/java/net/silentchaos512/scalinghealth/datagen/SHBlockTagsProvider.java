@@ -1,15 +1,17 @@
 package net.silentchaos512.scalinghealth.datagen;
 
 import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
 import net.minecraft.tags.BlockTags;
-import net.minecraftforge.common.data.BlockTagsProvider;
-import net.minecraftforge.data.event.GatherDataEvent;
+import net.neoforged.neoforge.common.data.BlockTagsProvider;
 import net.silentchaos512.scalinghealth.ScalingHealth;
 import net.silentchaos512.scalinghealth.objects.Registration;
 
+import java.util.concurrent.CompletableFuture;
+
 public class SHBlockTagsProvider extends BlockTagsProvider {
-    public SHBlockTagsProvider(GatherDataEvent event) {
-        super(event.getGenerator().getPackOutput(), event.getLookupProvider(),  ScalingHealth.MOD_ID, event.getExistingFileHelper());
+    public SHBlockTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider) {
+        super(output, lookupProvider, ScalingHealth.MOD_ID);
     }
 
     @Override

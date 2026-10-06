@@ -2,10 +2,12 @@ package net.silentchaos512.scalinghealth.utils.mode;
 
 import com.mojang.datafixers.util.Pair;
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Tuple;
 import net.minecraft.world.level.Level;
+import net.minecraft.server.level.ServerLevel;
 import net.silentchaos512.scalinghealth.capability.DifficultySourceCapability;
 import net.silentchaos512.scalinghealth.capability.IDifficultySource;
 import net.silentchaos512.scalinghealth.utils.config.SHDifficulty;
@@ -17,12 +19,13 @@ import java.util.function.Supplier;
 
 public class AreaDifficultyModes {
     public static class Average extends AreaDifficultyMode.RadialMode {
-        public static final Codec<Average> CODEC = RecordCodecBuilder.create(inst ->
+        public static final MapCodec<Average> MAP_CODEC = RecordCodecBuilder.mapCodec(inst ->
                 inst.group(
                         SerializationUtils.positiveInt(64).fieldOf("radius").forGetter(RadialMode::getRadius),
                         Codec.BOOL.optionalFieldOf("weighted", true).forGetter(a -> a.weighted)
                 ).apply(inst, Average::new)
         );
+        public static final Codec<Average> CODEC = MAP_CODEC.codec();
 
         public final boolean weighted;
 
@@ -66,12 +69,13 @@ public class AreaDifficultyModes {
     }
 
     public static class Extrema extends AreaDifficultyMode.RadialMode {
-        public static final Codec<Extrema> CODEC = RecordCodecBuilder.create(inst ->
+        public static final MapCodec<Extrema> MAP_CODEC = RecordCodecBuilder.mapCodec(inst ->
                 inst.group(
                         SerializationUtils.positiveInt(64).fieldOf("radius").forGetter(RadialMode::getRadius),
                         Codec.BOOL.optionalFieldOf("min", true).forGetter(a -> a.min)
                 ).apply(inst, Extrema::new)
         );
+        public static final Codec<Extrema> CODEC = MAP_CODEC.codec();
 
         private final BinaryOperator<Double> extremaFct;
         private final boolean min;
@@ -98,12 +102,13 @@ public class AreaDifficultyModes {
     }
 
     public static class Distance extends AreaDifficultyMode {
-        public static final Codec<Distance> CODEC = RecordCodecBuilder.create(inst ->
+        public static final MapCodec<Distance> MAP_CODEC = RecordCodecBuilder.mapCodec(inst ->
                 inst.group(
                         SerializationUtils.positiveDouble().fieldOf("distanceFactor").forGetter(r -> r.distanceFactor),
                         Codec.BOOL.optionalFieldOf("fromOrigin", false).forGetter(a -> a.fromOrigin)
                 ).apply(inst, Distance::new)
         );
+        public static final Codec<Distance> CODEC = MAP_CODEC.codec();
 
         private static final BlockPos ADJUSTED_ZERO = BlockPos.ZERO.above(65);
 
@@ -121,7 +126,7 @@ public class AreaDifficultyModes {
         @Override
         public double getDifficulty(Level world, BlockPos pos) {
             if(worldSpawn == null)
-                worldSpawn = new BlockPos(world.getLevelData().getXSpawn(), world.getLevelData().getYSpawn(), world.getLevelData().getZSpawn());
+                worldSpawn = world.getLevelData().getRespawnData().pos();
             return Math.sqrt(pos.distSqr(center.get())) * this.distanceFactor;
         }
 
@@ -132,12 +137,13 @@ public class AreaDifficultyModes {
     }
 
     public static class DistanceAndTime extends AreaDifficultyMode {
-        public static final Codec<DistanceAndTime> CODEC = RecordCodecBuilder.create(inst ->
+        public static final MapCodec<DistanceAndTime> MAP_CODEC = RecordCodecBuilder.mapCodec(inst ->
                 inst.group(
                         Average.CODEC.fieldOf("average").forGetter(dt -> dt.time),
                         Distance.CODEC.fieldOf("distance").forGetter(dt -> dt.distance)
                 ).apply(inst, DistanceAndTime::new)
         );
+        public static final Codec<DistanceAndTime> CODEC = MAP_CODEC.codec();
 
         private final Average time;
         private final Distance distance;
@@ -161,12 +167,18 @@ public class AreaDifficultyModes {
     public static class ServerWide extends AreaDifficultyMode {
         public static final ServerWide INSTANCE = new ServerWide();
 
-        public static final Codec<ServerWide> CODEC = Codec.unit(INSTANCE);
+        public static final MapCodec<ServerWide> MAP_CODEC = MapCodec.unit(INSTANCE);
+        public static final Codec<ServerWide> CODEC = MAP_CODEC.codec();
 
         @Override
         public double getDifficulty(Level world, BlockPos pos) {
-            return DifficultySourceCapability.getOverworldCap()
-                    .map(IDifficultySource::getDifficulty).orElse(0f);
+            if (world.isClientSide())
+                return DifficultySourceCapability.getClientWorldDifficulty();
+            if (world instanceof ServerLevel server)
+                return server.getServer().overworld().getExistingData(DifficultySourceCapability.INSTANCE)
+                        .map(IDifficultySource::getDifficulty)
+                        .orElse(0f);
+            return 0;
         }
 
         @Override

@@ -1,8 +1,18 @@
 package net.silentchaos512.scalinghealth.network;
 
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
+import net.silentchaos512.scalinghealth.ScalingHealth;
 
-public class ClientSyncMessage {
+public class ClientSyncMessage implements CustomPacketPayload {
+    public static final Type<ClientSyncMessage> TYPE = new Type<>(Identifier.fromNamespaceAndPath(ScalingHealth.MOD_ID, "client_sync"));
+    public static final StreamCodec<FriendlyByteBuf, ClientSyncMessage> CODEC = StreamCodec.ofMember(
+            ClientSyncMessage::toBytes,
+            ClientSyncMessage::fromBytes
+    );
+
     public float playerDifficulty;
     public float worldDifficulty;
     public float areaDifficulty;
@@ -39,5 +49,10 @@ public class ClientSyncMessage {
         buf.writeVarInt(regenTimer);
         buf.writeVarInt(locationMultiPercent);
         buf.writeVarInt(experienceLevel);
+    }
+
+    @Override
+    public Type<ClientSyncMessage> type() {
+        return TYPE;
     }
 }

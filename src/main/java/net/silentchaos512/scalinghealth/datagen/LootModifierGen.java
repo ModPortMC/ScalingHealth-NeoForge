@@ -1,18 +1,21 @@
 package net.silentchaos512.scalinghealth.datagen;
 
-import net.minecraft.data.DataGenerator;
-import net.minecraft.world.level.storage.loot.entries.LootTableReference;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
 import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
-import net.minecraftforge.common.data.GlobalLootModifierProvider;
-import net.minecraftforge.common.loot.LootTableIdCondition;
+import net.neoforged.neoforge.common.data.GlobalLootModifierProvider;
+import net.neoforged.neoforge.common.loot.IGlobalLootModifier;
+import net.neoforged.neoforge.common.loot.LootTableIdCondition;
 import net.silentchaos512.scalinghealth.ScalingHealth;
 import net.silentchaos512.scalinghealth.loot.TableGlobalModifier;
 import net.silentchaos512.scalinghealth.loot.conditions.EntityGroupCondition;
 import net.silentchaos512.scalinghealth.utils.EntityGroup;
 
+import java.util.concurrent.CompletableFuture;
+
 public class LootModifierGen extends GlobalLootModifierProvider {
-    public LootModifierGen(DataGenerator gen) {
-        super(gen.getPackOutput(), ScalingHealth.MOD_ID);
+    public LootModifierGen(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider) {
+        super(output, lookupProvider, ScalingHealth.MOD_ID);
     }
 
     @Override
@@ -25,19 +28,22 @@ public class LootModifierGen extends GlobalLootModifierProvider {
         this.add("hostile",
                 new TableGlobalModifier(
                         new LootItemCondition[]{new EntityGroupCondition(EntityGroup.HOSTILE)},
-                        (LootTableReference) LootTableReference.lootTableReference(ScalingHealth.getId("bonus_drops/hostile")).build()
+                        IGlobalLootModifier.DEFAULT_PRIORITY,
+                        MobTables.fromGroup(EntityGroup.HOSTILE)
                 ));
         this.add("peaceful",
                 new TableGlobalModifier(
                         new LootItemCondition[]{new EntityGroupCondition(EntityGroup.PEACEFUL)},
-                        (LootTableReference) LootTableReference.lootTableReference(ScalingHealth.getId("bonus_drops/peaceful")).build()
+                        IGlobalLootModifier.DEFAULT_PRIORITY,
+                        MobTables.fromGroup(EntityGroup.PEACEFUL)
                 ));
 
         ChestLootTables.CHESTS.forEach(rl ->
-                this.add(rl.getPath(),
+                this.add(rl.identifier().getPath(),
                         new TableGlobalModifier(
-                                new LootItemCondition[]{LootTableIdCondition.builder(rl).build()},
-                                (LootTableReference) LootTableReference.lootTableReference(ChestLootTables.VANILLA_TO_SH.get(rl)).build()
+                                new LootItemCondition[]{LootTableIdCondition.builder(rl.identifier()).build()},
+                                IGlobalLootModifier.DEFAULT_PRIORITY,
+                                ChestLootTables.VANILLA_TO_SH.get(rl)
                         )
                 ));
 

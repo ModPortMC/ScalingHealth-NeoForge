@@ -1,42 +1,40 @@
 package net.silentchaos512.scalinghealth.datagen;
 
-import net.minecraft.world.level.block.Block;
-import net.minecraftforge.client.model.generators.BlockStateProvider;
-import net.minecraftforge.data.event.GatherDataEvent;
+import net.minecraft.client.data.models.BlockModelGenerators;
+import net.minecraft.client.data.models.ItemModelGenerators;
+import net.minecraft.client.data.models.ModelProvider;
+import net.minecraft.client.data.models.model.ModelLocationUtils;
+import net.minecraft.client.data.models.model.ModelTemplates;
+import net.minecraft.data.PackOutput;
 import net.silentchaos512.scalinghealth.ScalingHealth;
 import net.silentchaos512.scalinghealth.objects.Registration;
 
-public class BlockStateGen extends BlockStateProvider {
-    public BlockStateGen(GatherDataEvent event) {
-        super(event.getGenerator().getPackOutput(), ScalingHealth.MOD_ID, event.getExistingFileHelper());
+public class BlockStateGen extends ModelProvider {
+    public BlockStateGen(PackOutput output) {
+        super(output, ScalingHealth.MOD_ID);
     }
 
     @Override
-    protected void registerStatesAndModels() {
-        simpleBlockAndBlockItem(Registration.HEART_CRYSTAL_ORE.get());
-        simpleBlockAndBlockItem(Registration.POWER_CRYSTAL_ORE.get());
-        simpleBlockAndBlockItem(Registration.DEEPLSATE_HEART_CRYSTAL_ORE.get());
-        simpleBlockAndBlockItem(Registration.DEEPSLATE_POWER_CRYSTAL_ORE.get());
+    protected void registerModels(BlockModelGenerators blockModels, ItemModelGenerators itemModels) {
+        simpleBlock(blockModels, Registration.HEART_CRYSTAL_ORE.get());
+        simpleBlock(blockModels, Registration.POWER_CRYSTAL_ORE.get());
+        simpleBlock(blockModels, Registration.DEEPLSATE_HEART_CRYSTAL_ORE.get());
+        simpleBlock(blockModels, Registration.DEEPSLATE_POWER_CRYSTAL_ORE.get());
 
-        simpleItem("bandages");
-        simpleItem("chance_heart");
-        simpleItem("cursed_heart");
-        simpleItem("enchanted_heart");
-        simpleItem("heart_crystal");
-        simpleItem("heart_crystal_shard");
-        simpleItem("heart_dust");
-        simpleItem("medkit");
-        simpleItem("power_crystal");
-        simpleItem("power_crystal_shard");
+        itemModels.generateFlatItem(Registration.BANDAGES.get(), ModelTemplates.FLAT_ITEM);
+        itemModels.generateFlatItem(Registration.CHANCE_HEART.get(), ModelTemplates.FLAT_ITEM);
+        itemModels.generateFlatItem(Registration.CURSED_HEART.get(), ModelTemplates.FLAT_ITEM);
+        itemModels.generateFlatItem(Registration.ENCHANTED_HEART.get(), ModelTemplates.FLAT_ITEM);
+        itemModels.generateFlatItem(Registration.HEART_CRYSTAL.get(), ModelTemplates.FLAT_ITEM);
+        itemModels.generateFlatItem(Registration.HEART_CRYSTAL_SHARD.get(), ModelTemplates.FLAT_ITEM);
+        itemModels.generateFlatItem(Registration.HEART_DUST.get(), ModelTemplates.FLAT_ITEM);
+        itemModels.generateFlatItem(Registration.MEDKIT.get(), ModelTemplates.FLAT_ITEM);
+        itemModels.generateFlatItem(Registration.POWER_CRYSTAL.get(), ModelTemplates.FLAT_ITEM);
+        itemModels.generateFlatItem(Registration.POWER_CRYSTAL_SHARD.get(), ModelTemplates.FLAT_ITEM);
     }
 
-    private void simpleBlockAndBlockItem(Block block) {
-        simpleBlock(block);
-        simpleBlockItem(block, cubeAll(block));
-    }
-
-    private void simpleItem(String name) {
-        itemModels().withExistingParent(name, "item/generated")
-                .texture("layer0", ScalingHealth.getId("item/" + name));
+    private static void simpleBlock(BlockModelGenerators models, net.minecraft.world.level.block.Block block) {
+        models.createTrivialCube(block);
+        models.registerSimpleItemModel(block, ModelLocationUtils.getModelLocation(block));
     }
 }

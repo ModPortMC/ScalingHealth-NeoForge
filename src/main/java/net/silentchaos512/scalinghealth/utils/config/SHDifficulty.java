@@ -5,17 +5,19 @@ import com.udojava.evalex.Expression;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Vec3i;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.util.Tuple;
+import net.minecraft.world.attribute.EnvironmentAttributes;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraftforge.common.capabilities.ICapabilityProvider;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.attachment.IAttachmentHolder;
 import net.silentchaos512.lib.util.MCMathUtils;
 import net.silentchaos512.scalinghealth.capability.DifficultyAffectedCapability;
 import net.silentchaos512.scalinghealth.capability.DifficultySourceCapability;
@@ -26,7 +28,6 @@ import net.silentchaos512.scalinghealth.resources.mechanics.DifficultyMechanics;
 import net.silentchaos512.scalinghealth.resources.mechanics.SHMechanics;
 import net.silentchaos512.scalinghealth.utils.EntityGroup;
 import net.silentchaos512.scalinghealth.utils.mode.AreaDifficultyMode;
-import net.silentchaos512.utils.MathUtils;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -42,19 +43,29 @@ public final class SHDifficulty {
         return SHMechanics.getMechanics().difficultyMechanics(); // cache?
     }
 
-    public static IDifficultyAffected affected(ICapabilityProvider entity) {
-        return entity.getCapability(DifficultyAffectedCapability.INSTANCE)
-                .orElseGet(DifficultyAffectedCapability::new);
+    /**
+     * Returns retained difficulty data for eligible mobs. A missing attachment on an
+     * ineligible mob or another holder keeps the detached default used by read-only callers.
+     */
+    public static IDifficultyAffected affected(IAttachmentHolder entity) {
+        return entity.getExistingData(DifficultyAffectedCapability.INSTANCE)
+                .map(data -> (IDifficultyAffected) data)
+                .orElseGet(() -> {
+                    if (entity instanceof Mob mob && SHMobs.allowsDifficultyChanges(mob))
+                        return mob.getData(DifficultyAffectedCapability.INSTANCE);
+                    return new DifficultyAffectedCapability();
+                });
     }
 
-    public static IDifficultySource source(ICapabilityProvider source) {
-        return source.getCapability(DifficultySourceCapability.INSTANCE)
+    public static IDifficultySource source(IAttachmentHolder holder) {
+        return holder.getExistingData(DifficultySourceCapability.INSTANCE)
+                .map(data -> (IDifficultySource) data)
                 .orElseGet(DifficultySourceCapability::new);
     }
 
     public static void setSourceDifficulty(Player player, double difficulty){
         IDifficultySource source = SHDifficulty.source(player);
-        if (!MathUtils.doublesEqual(source.getDifficulty(), difficulty)) {
+        if (!(Math.abs(source.getDifficulty() - difficulty) < 1.0E-6)) {
             source.setDifficulty((float) difficulty);                               //player diff
             SHDifficulty.source(player.level()).setDifficulty((float) difficulty);    //world diff
         }
@@ -99,7 +110,7 @@ public final class SHDifficulty {
     public static double areaDifficulty(Level world, BlockPos pos, boolean groupBonus) {
         return clamp(areaMode().getDifficulty(world, pos) *
                 locationMultiplier(world, pos) *
-                lunarMultiplier(world) *
+                lunarMultiplier(world, pos) *
                 (groupBonus ? groupMultiplier(world, pos) : 1));
     }
 
@@ -107,14 +118,15 @@ public final class SHDifficulty {
         Holder<Biome> biome = world.getBiome(pos);
         if (!biome.isBound())
             return 1;
-        return getMechanics().multipliers.getScale(world, world.getBiome(pos).value());
+        return getMechanics().multipliers.getScale(world, biome);
     }
 
-    //TODO Can't be checked on the ClientWorld, have to send packet (for debug overlay)
-    public static double lunarMultiplier(Level world) {
-        return (world.dimension() != Level.OVERWORLD || world.isDay()) ? 1 :
+    // The synced environment attributes expose the positional moon phase on both sides.
+    public static double lunarMultiplier(Level world, BlockPos pos) {
+        return (world.dimension() != Level.OVERWORLD || world.isBrightOutside()) ? 1 :
                 getMechanics().multipliers
-                        .getLunarMultiplier(world.dimensionType().moonPhase(world.dayTime()));
+                        .getLunarMultiplier(world.environmentAttributes()
+                                .getValue(EnvironmentAttributes.MOON_PHASE, pos).index());
     }
 
     public static double groupMultiplier(Level world, BlockPos pos) {
@@ -169,8 +181,8 @@ public final class SHDifficulty {
             setSourceDifficulty(killer, EvalVars.apply(killer, getMechanics().mutators.onBlightKilled().get()));
 
         //check for entity specific mutators first
-        for (Pair<List<ResourceLocation>, Supplier<Expression>> p : getMechanics().mutators.byEntity()) {
-            if (p.getFirst().contains(ForgeRegistries.ENTITY_TYPES.getKey(killed.getType()))) {
+        for (Pair<List<Identifier>, Supplier<Expression>> p : getMechanics().mutators.byEntity()) {
+            if (p.getFirst().contains(BuiltInRegistries.ENTITY_TYPE.getKey(killed.getType()))) {
                 setSourceDifficulty(killer, EvalVars.apply(killer, p.getSecond().get()));
                 return;
             }

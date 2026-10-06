@@ -1,9 +1,9 @@
 package net.silentchaos512.scalinghealth.datagen;
 
 import com.google.common.collect.Lists;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.data.loot.LootTableSubProvider;
-import net.minecraft.data.loot.packs.VanillaChestLoot;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.storage.loot.BuiltInLootTables;
 import net.minecraft.world.level.storage.loot.LootPool;
 import net.minecraft.world.level.storage.loot.LootTable;
@@ -21,7 +21,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class ChestLootTables implements LootTableSubProvider {
-    public static final List<ResourceLocation> CHESTS = Lists.newArrayList(
+    public static final List<ResourceKey<LootTable>> CHESTS = Lists.newArrayList(
             BuiltInLootTables.ABANDONED_MINESHAFT,
             BuiltInLootTables.BURIED_TREASURE,
             BuiltInLootTables.NETHER_BRIDGE,
@@ -31,14 +31,14 @@ public class ChestLootTables implements LootTableSubProvider {
             BuiltInLootTables.WOODLAND_MANSION
     );
 
-    public static final Map<ResourceLocation, ResourceLocation> VANILLA_TO_SH = CHESTS
+    public static final Map<ResourceKey<LootTable>, ResourceKey<LootTable>> VANILLA_TO_SH = CHESTS
             .stream()
             .collect(Collectors.toMap(Function.identity(),
-                    rl -> ScalingHealth.getId("chests_addition/" + rl.getPath().substring(rl.getPath().indexOf("/") + 1))
+                    rl -> lootTableKey("chests_addition/" + rl.identifier().getPath().substring(rl.identifier().getPath().indexOf("/") + 1))
             ));
 
     @Override
-    public void generate(BiConsumer<ResourceLocation, LootTable.Builder> consumer) {
+    public void generate(BiConsumer<ResourceKey<LootTable>, LootTable.Builder> consumer) {
         LootTable.Builder builder = LootTable.lootTable().withPool(
                 new LootPool.Builder()
                         .setRolls(UniformGenerator.between(0, 1))
@@ -60,5 +60,9 @@ public class ChestLootTables implements LootTableSubProvider {
                         ).add(EmptyLootItem.emptyItem().setWeight(10)));
 
         VANILLA_TO_SH.values().forEach(rl -> consumer.accept(rl, builder));
+    }
+
+    private static ResourceKey<LootTable> lootTableKey(String path) {
+        return ResourceKey.create(Registries.LOOT_TABLE, ScalingHealth.getId(path));
     }
 }

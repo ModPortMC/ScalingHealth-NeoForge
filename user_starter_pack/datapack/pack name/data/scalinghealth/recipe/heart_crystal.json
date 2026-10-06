@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "group": "scalinghealth",
+  "key": {
+    "x": "scalinghealth:heart_crystal_shard"
+  },
+  "pattern": [
+    "xxx",
+    "xxx",
+    "xxx"
+  ],
+  "result": {
+    "id": "scalinghealth:heart_crystal"
+  },
+  "show_notification": false
+}

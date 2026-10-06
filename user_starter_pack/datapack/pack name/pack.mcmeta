@@ -1,6 +1,10 @@
 {
-    "pack": {
-        "description": "A pack!",
-        "pack_format": 6
-    }
+  "pack": {
+    "description": "A pack!",
+    "min_format": [
+      101,
+      1
+    ],
+    "max_format": 101
+  }
 }

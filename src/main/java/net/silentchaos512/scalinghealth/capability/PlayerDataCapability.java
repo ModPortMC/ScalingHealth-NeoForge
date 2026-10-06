@@ -1,34 +1,29 @@
 package net.silentchaos512.scalinghealth.capability;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.player.Player;
-import net.minecraftforge.common.capabilities.*;
-import net.minecraftforge.common.util.LazyOptional;
-import net.silentchaos512.scalinghealth.ScalingHealth;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.neoforged.neoforge.attachment.AttachmentType;
+import net.neoforged.neoforge.common.util.ValueIOSerializable;
 import net.silentchaos512.scalinghealth.utils.ModifierHandler;
 import net.silentchaos512.scalinghealth.utils.config.SHDifficulty;
 import net.silentchaos512.scalinghealth.utils.config.SHPlayers;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-
-public class PlayerDataCapability implements IPlayerData, ICapabilitySerializable<CompoundTag> {
-    public static Capability<IPlayerData> INSTANCE = CapabilityManager.get(new CapabilityToken<>() {});;
-    public static ResourceLocation NAME = ScalingHealth.getId("player_data");
+public class PlayerDataCapability implements IPlayerData, ValueIOSerializable {
+    public static final AttachmentType<PlayerDataCapability> INSTANCE = AttachmentType
+            .serializable(PlayerDataCapability::new)
+            .copyOnDeath()
+            .build();
 
     private static final String NBT_HEART_CRYSTALS = "HeartCrystals";
     private static final String NBT_POWER_CRYSTALS = "PowerCrystals";
 
-    private final LazyOptional<IPlayerData> holder = LazyOptional.of(() -> this);
-
-    private boolean afk = false;
-    private int timeAfk = 0;
+    private boolean afk;
+    private int timeAfk;
     private BlockPos lastPos;
 
     private int heartCrystals;
@@ -47,7 +42,7 @@ public class PlayerDataCapability implements IPlayerData, ICapabilitySerializabl
     @Override
     public void setHeartCrystals(Player player, int amount) {
         heartCrystals = SHPlayers.clampExtraHearts(amount);
-        ModifierHandler.setMaxHealth(player, getModifiedHealth(player), AttributeModifier.Operation.ADDITION);
+        ModifierHandler.setMaxHealth(player, getModifiedHealth(player), AttributeModifier.Operation.ADD_VALUE);
     }
 
     @Override
@@ -58,21 +53,21 @@ public class PlayerDataCapability implements IPlayerData, ICapabilitySerializabl
     @Override
     public void setPowerCrystalCount(Player player, int amount) {
         powerCrystals = SHPlayers.clampPowerCrystals(amount);
-        ModifierHandler.addAttackDamage(player, getAttackDamageModifier(), AttributeModifier.Operation.ADDITION);
+        ModifierHandler.addAttackDamage(player, getAttackDamageModifier(), AttributeModifier.Operation.ADD_VALUE);
     }
 
     @Override
     public void updateStats(Player player) {
-        ModifierHandler.setMaxHealth(player, getModifiedHealth(player), AttributeModifier.Operation.ADDITION);
-        ModifierHandler.addAttackDamage(player, getAttackDamageModifier(), AttributeModifier.Operation.ADDITION);
+        ModifierHandler.setMaxHealth(player, getModifiedHealth(player), AttributeModifier.Operation.ADD_VALUE);
+        ModifierHandler.addAttackDamage(player, getAttackDamageModifier(), AttributeModifier.Operation.ADD_VALUE);
     }
 
     @Override
     public void tick(Player player) {
-        if (player.level().getGameTime() % 20 == 0 && !player.level().isClientSide) {
+        if (player.level().getGameTime() % 20 == 0 && !player.level().isClientSide()) {
             checkPlayerIdle(player);
 
-            if(player instanceof ServerPlayer)
+            if (player instanceof ServerPlayer)
                 IPlayerData.sendUpdatePacketTo(player);
         }
     }
@@ -82,61 +77,37 @@ public class PlayerDataCapability implements IPlayerData, ICapabilitySerializabl
 
         if (player.blockPosition().equals(lastPos)) {
             timeAfk++;
-        }
-        else {
+        } else {
             afk = false;
             timeAfk = 0;
         }
 
         lastPos = player.blockPosition();
         if (timeAfk > SHDifficulty.timeBeforeAfk()) {
-            if(!afk) {
+            if (!afk) {
                 afk = true;
-                if(SHDifficulty.afkMessage()) player.sendSystemMessage(Component.translatable("misc.scalinghealth.afkmessage"));
+                if (SHDifficulty.afkMessage())
+                    player.sendSystemMessage(Component.translatable("misc.scalinghealth.afkmessage"));
             }
         }
 
         if (afk) {
             IDifficultySource data = SHDifficulty.source(player);
             float changePerSec = (float) SHDifficulty.changePerSecond();
-            //since last second we added "changePerSec" difficulty, we subtract an amount based on idlemodifier
-            data.addDifficulty(- changePerSec * (float) (1 - SHDifficulty.idleModifier()));
+            // Since last second we added changePerSec difficulty, subtract the idle portion.
+            data.addDifficulty(-changePerSec * (float) (1 - SHDifficulty.idleModifier()));
         }
     }
 
-    @Nonnull
     @Override
-    public <T> LazyOptional<T> getCapability(@Nonnull Capability<T> cap, @Nullable Direction side) {
-        return INSTANCE.orEmpty(cap, holder);
+    public void serialize(ValueOutput output) {
+        output.putInt(NBT_HEART_CRYSTALS, heartCrystals);
+        output.putInt(NBT_POWER_CRYSTALS, powerCrystals);
     }
 
     @Override
-    public CompoundTag serializeNBT() {
-        CompoundTag nbt = new CompoundTag();
-        nbt.putInt(NBT_HEART_CRYSTALS, heartCrystals);
-        nbt.putInt(NBT_POWER_CRYSTALS, powerCrystals);
-        return nbt;
-    }
-
-    @Override
-    public void deserializeNBT(CompoundTag nbt) {
-        heartCrystals = nbt.getInt(NBT_HEART_CRYSTALS);
-        powerCrystals = nbt.getInt(NBT_POWER_CRYSTALS);
-    }
-
-    public static boolean canAttachTo(ICapabilityProvider entity) {
-        if (!(entity instanceof Player)) {
-            return false;
-        }
-        try {
-            if (entity.getCapability(INSTANCE).isPresent()) {
-                return false;
-            }
-        } catch (NullPointerException ex) {
-            // Forge seems to be screwing up somewhere?
-            ScalingHealth.LOGGER.error("Failed to get capabilities from {}", entity);
-            return false;
-        }
-        return true;
+    public void deserialize(ValueInput input) {
+        heartCrystals = input.getIntOr(NBT_HEART_CRYSTALS, 0);
+        powerCrystals = input.getIntOr(NBT_POWER_CRYSTALS, 0);
     }
 }

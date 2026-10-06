@@ -23,32 +23,30 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.living.LivingExperienceDropEvent;
-import net.minecraftforge.event.entity.living.MobSpawnEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.event.entity.player.PlayerSleepInBedEvent;
-import net.minecraftforge.event.entity.player.PlayerWakeUpEvent;
-import net.minecraftforge.event.entity.player.PlayerXpEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.network.NetworkDirection;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.living.LivingExperienceDropEvent;
+import net.neoforged.neoforge.event.entity.living.FinalizeSpawnEvent;
+import net.neoforged.neoforge.event.entity.player.CanPlayerSleepEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerWakeUpEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerXpEvent;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.silentchaos512.scalinghealth.ScalingHealth;
 import net.silentchaos512.scalinghealth.config.SHConfig;
 import net.silentchaos512.scalinghealth.network.ClientLoginMessage;
-import net.silentchaos512.scalinghealth.network.Network;
 import net.silentchaos512.scalinghealth.utils.config.EnabledFeatures;
 import net.silentchaos512.scalinghealth.utils.config.SHDifficulty;
 import net.silentchaos512.scalinghealth.utils.config.SHMobs;
 import net.silentchaos512.scalinghealth.utils.config.SHPlayers;
-import net.silentchaos512.utils.MathUtils;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-@Mod.EventBusSubscriber(modid = ScalingHealth.MOD_ID)
+@EventBusSubscriber(modid = ScalingHealth.MOD_ID)
 public final class CommonEvents {
    public static List<UUID> spawnerSpawns = new ArrayList<>();
    private static boolean changedLevelThisTick = false;
@@ -62,11 +60,11 @@ public final class CommonEvents {
       ServerPlayer sp = (ServerPlayer) event.getEntity();
       ScalingHealth.LOGGER.debug("Sending login packet to player {}", player);
       ClientLoginMessage msg = new ClientLoginMessage(SHDifficulty.areaMode(), (float) SHDifficulty.maxValue());
-      Network.channel.sendTo(msg, sp.connection.connection, NetworkDirection.PLAY_TO_CLIENT);
+      PacketDistributor.sendToPlayer(sp, msg);
    }
 
    @SubscribeEvent
-   public static void onSpawn(MobSpawnEvent.FinalizeSpawn event){
+   public static void onSpawn(FinalizeSpawnEvent event){
       if(event.getSpawner() != null)
          spawnerSpawns.add(event.getEntity().getUUID());
    }
@@ -91,11 +89,10 @@ public final class CommonEvents {
    }
 
    @SubscribeEvent
-   public static void playerTick(TickEvent.PlayerTickEvent event){
-      if(event.phase == TickEvent.Phase.START) return;
-      Player player = event.player;
+   public static void playerTick(PlayerTickEvent.Post event){
+      Player player = event.getEntity();
 
-      if (player.level().isClientSide || !player.isAlive())
+      if (player.level().isClientSide() || !player.isAlive())
          return;
       SHPlayers.getPlayerData(player).tick(player);
 
@@ -121,12 +118,12 @@ public final class CommonEvents {
 //   }
 
    @SubscribeEvent
-   public static void onPlayerSleepInBed(PlayerSleepInBedEvent event) {
+   public static void onPlayerSleepInBed(CanPlayerSleepEvent event) {
       Player player = event.getEntity();
-      if (!player.level().isClientSide && SHConfig.CLIENT.warnWhenSleeping.get()) {
+      if (!player.level().isClientSide() && SHConfig.CLIENT.warnWhenSleeping.get()) {
          double newDifficulty = SHDifficulty.diffOnPlayerSleep(player);
 
-         if (!MathUtils.doublesEqual(SHDifficulty.getDifficultyOf(player), newDifficulty, 0.1)) {
+         if (!(Math.abs(SHDifficulty.getDifficultyOf(player) - newDifficulty) < 0.1)) {
             ScalingHealth.LOGGER.debug("old={}, new={}", SHDifficulty.getDifficultyOf(player), newDifficulty);
             player.sendSystemMessage(Component.translatable("misc.scalinghealth.sleepWarning"));
          }
@@ -136,7 +133,7 @@ public final class CommonEvents {
    @SubscribeEvent
    public static void onPlayerWakeUp(PlayerWakeUpEvent event) {
       Player player = event.getEntity();
-      if (!player.level().isClientSide && !event.updateLevel()) {
+      if (!player.level().isClientSide() && !event.updateLevel()) {
          SHDifficulty.setSourceDifficulty(player, SHDifficulty.diffOnPlayerSleep(player));
       }
    }

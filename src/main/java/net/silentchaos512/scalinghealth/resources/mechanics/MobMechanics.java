@@ -18,7 +18,7 @@ public record MobMechanics(MobHealthMode mode,
     public static final String FILE = "mobs";
 
     public static final MobMechanics DEFAULT = new MobMechanics(
-            new MobHealthMode(AttributeModifier.Operation.MULTIPLY_BASE, 0.5),
+            new MobHealthMode(AttributeModifier.Operation.ADD_MULTIPLIED_BASE, 0.5),
             Generic.DEFAULT,
             Collections.EMPTY_LIST,
             Blight.DEFAULT,

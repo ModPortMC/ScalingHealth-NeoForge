@@ -1,7 +1,10 @@
 package net.silentchaos512.scalinghealth.datagen;
 
+import net.minecraft.core.HolderLookup;
 import net.minecraft.data.loot.LootTableSubProvider;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.storage.loot.LootContext;
 import net.minecraft.world.level.storage.loot.LootPool;
@@ -9,7 +12,7 @@ import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.entries.LootItem;
 import net.minecraft.world.level.storage.loot.functions.SetItemCountFunction;
 import net.minecraft.world.level.storage.loot.predicates.LootItemKilledByPlayerCondition;
-import net.minecraft.world.level.storage.loot.predicates.LootItemRandomChanceWithLootingCondition;
+import net.minecraft.world.level.storage.loot.predicates.LootItemRandomChanceWithEnchantedBonusCondition;
 import net.minecraft.world.level.storage.loot.providers.number.ConstantValue;
 import net.minecraft.world.level.storage.loot.providers.number.UniformGenerator;
 import net.silentchaos512.scalinghealth.ScalingHealth;
@@ -21,8 +24,14 @@ import java.util.Locale;
 import java.util.function.BiConsumer;
 
 public class MobTables implements LootTableSubProvider {
+    private final HolderLookup.Provider registries;
+
+    public MobTables(HolderLookup.Provider registries) {
+        this.registries = registries;
+    }
+
     @Override
-    public void generate(BiConsumer<ResourceLocation, LootTable.Builder> consumer) {
+    public void generate(BiConsumer<ResourceKey<LootTable>, LootTable.Builder> consumer) {
         consumer.accept(fromGroup(EntityGroup.HOSTILE),
                 createSHDropsTable(
                         createSHDropsPool( 1,
@@ -60,18 +69,19 @@ public class MobTables implements LootTableSubProvider {
                 ));
     }
 
-    public static ResourceLocation fromGroup(EntityGroup group) {
-        return ScalingHealth.getId("bonus_drops/" + group.name().toLowerCase(Locale.ROOT));
+    public static ResourceKey<LootTable> fromGroup(EntityGroup group) {
+        Identifier id = ScalingHealth.getId("bonus_drops/" + group.name().toLowerCase(Locale.ROOT));
+        return ResourceKey.create(Registries.LOOT_TABLE, id);
     }
 
-    public static LootTable.Builder createSHDropsTable(LootPool.Builder... pools) {
+    public LootTable.Builder createSHDropsTable(LootPool.Builder... pools) {
         LootTable.Builder table = LootTable.lootTable();
         for (LootPool.Builder pool : pools)
             table.withPool(pool);
         return table;
     }
 
-    public static LootPool.Builder createSHDropsPool(int rolls, MobLootCondition conditions, MobLootEntry... entries) {
+    public LootPool.Builder createSHDropsPool(int rolls, MobLootCondition conditions, MobLootEntry... entries) {
         LootPool.Builder builder = LootPool.lootPool()
                 .setRolls(ConstantValue.exactly(rolls));
 
@@ -91,7 +101,7 @@ public class MobTables implements LootTableSubProvider {
         if (conditions.hasDiffCond() || conditions.blight)
             builder.when(SHMobProperties.builder(LootContext.EntityTarget.THIS, conditions.blight, conditions.difficulty, Integer.MAX_VALUE));
         if (conditions.hasLootCond())
-            builder.when(LootItemRandomChanceWithLootingCondition.randomChanceAndLootingBoost(conditions.lootingChance, conditions.lootingMulti));
+            builder.when(LootItemRandomChanceWithEnchantedBonusCondition.randomChanceAndLootingBoost(this.registries, conditions.lootingChance, conditions.lootingMulti));
         if (conditions.playerKill)
             builder.when(LootItemKilledByPlayerCondition.killedByPlayer());
 

@@ -20,18 +20,18 @@ package net.silentchaos512.scalinghealth.event;
 
 import com.mojang.datafixers.util.Pair;
 import com.mojang.serialization.Codec;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.living.LivingAttackEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.silentchaos512.scalinghealth.ScalingHealth;
 import net.silentchaos512.scalinghealth.config.SHConfig;
 import net.silentchaos512.scalinghealth.resources.mechanics.DamageScalingMechanics;
@@ -47,20 +47,21 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-@Mod.EventBusSubscriber(modid = ScalingHealth.MOD_ID)
+@EventBusSubscriber(modid = ScalingHealth.MOD_ID)
 public final class DamageScaling {
     private static final Marker MARKER = MarkerManager.getMarker("DamageScaling");
+    private static final float INVULNERABILITY_COOLDOWN_THRESHOLD = 10.0F;
 
     private static final Set<UUID> ENTITY_ATTACKED_THIS_TICK = new HashSet<>();
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onEntityHurt(LivingAttackEvent event) {
+    public static void onEntityHurt(LivingIncomingDamageEvent event) {
         if(!EnabledFeatures.mobDamageScalingEnabled() && !EnabledFeatures.playerDamageScalingEnabled()) return;
         LivingEntity entity = event.getEntity();
-        if (entity.level().isClientSide) return;
-        // Entity invulnerable?
-        if (entity.isInvulnerableTo(event.getSource()) || entity.invulnerableTime > entity.invulnerableDuration / 2)
-            return;
+        if (entity.level().isClientSide()) return;
+        // NeoForge fires this event after full invulnerability checks. Preserve the old
+        // half-cooldown guard for hits that pass vanilla's reduced-damage cooldown path.
+        if (entity.invulnerableTime > INVULNERABILITY_COOLDOWN_THRESHOLD) return;
 
         // Check entity has already been processed from original event, or is not allowed to be affected
         if (ENTITY_ATTACKED_THIS_TICK.contains(entity.getUUID()) || !EntityGroup.from(entity).isAffectedByDamageScaling())
@@ -82,15 +83,15 @@ public final class DamageScaling {
         final float affectedAmount = (float) getEffectScale(entity);
 
         // Calculate damage to add to the original.
-        final float original = event.getAmount();
+        final float original = event.getOriginalAmount();
         final float change = scale * affectedAmount * original;
 
         if (change > 0.0001f) {
-            final float newAmount = makeSane(event.getAmount() + change);
+            final float newAmount = makeSane(original + change);
 
             event.setCanceled(true);
             ENTITY_ATTACKED_THIS_TICK.add(entity.getUUID());
-            entity.hurt(event.getSource(), newAmount);
+            entity.hurt(source, newAmount);
 
             if (SHConfig.SERVER.debugLogScaledDamage.get()) {
                 ScalingHealth.LOGGER.debug(MARKER, "{} on {}: {} -> {} (scale={}, affected={}, change={})",
@@ -108,7 +109,7 @@ public final class DamageScaling {
             case MAX_HEALTH:
                 AttributeInstance attr = entity.getAttribute(Attributes.MAX_HEALTH);
                 if (attr == null) {
-                    ScalingHealth.LOGGER.warn("Living Entity {} has no max health attribute", ForgeRegistries.ENTITY_TYPES.getKey(entity.getType()));
+                    ScalingHealth.LOGGER.warn("Living Entity {} has no max health attribute", BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()));
                     return 1;
                 }
                 double baseHealth = entity instanceof Player
@@ -132,7 +133,12 @@ public final class DamageScaling {
     }
 
     @SubscribeEvent
-    public static void onServerTick(TickEvent.ServerTickEvent event) {
+    public static void onServerTickPre(ServerTickEvent.Pre event) {
+        ENTITY_ATTACKED_THIS_TICK.clear();
+    }
+
+    @SubscribeEvent
+    public static void onServerTickPost(ServerTickEvent.Post event) {
         ENTITY_ATTACKED_THIS_TICK.clear();
     }
 

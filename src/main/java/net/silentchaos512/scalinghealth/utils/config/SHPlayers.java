@@ -1,12 +1,12 @@
 package net.silentchaos512.scalinghealth.utils.config;
 
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.silentchaos512.scalinghealth.capability.IPlayerData;
 import net.silentchaos512.scalinghealth.capability.PlayerDataCapability;
 import net.silentchaos512.scalinghealth.config.EvalVars;
 import net.silentchaos512.scalinghealth.resources.mechanics.PlayerMechanics;
 import net.silentchaos512.scalinghealth.resources.mechanics.SHMechanics;
-import net.silentchaos512.utils.MathUtils;
 
 /**
  * Utility class for player-related settings. Same as with {@link SHDifficulty}, this should put a
@@ -20,7 +20,7 @@ public final class SHPlayers {
    }
 
    public static IPlayerData getPlayerData(Player entity) {
-      return entity.getCapability(PlayerDataCapability.INSTANCE).orElseThrow(() -> new IllegalStateException("Could not access capability"));
+      return entity.getData(PlayerDataCapability.INSTANCE);
    }
 
    public static int startingHealth() {
@@ -54,26 +54,26 @@ public final class SHPlayers {
    }
 
    public static int clampExtraHearts(int value) {
-      return MathUtils.clamp(value,
+      return Mth.clamp(value,
               (minHealth() - startingHealth()) / 2,
               (maxHealth() - startingHealth()) / 2
       );
    }
 
    public static int clampedHpFromHeartCrystals(int crystals) { //clamping to not decrease hp to a non-integer multiple of heart crystals.
-      int clampedCrystals = MathUtils.clamp(crystals, minHeartCrystals(), maxHeartCrystals());
+      int clampedCrystals = Mth.clamp(crystals, minHeartCrystals(), maxHeartCrystals());
       return clampedCrystals * SHItems.heartCrystalIncreaseAmount();
    }
 
    public static int clampPowerCrystals(int value) {
-      return MathUtils.clamp(value,
+      return Mth.clamp(value,
               0,
               maxPowerCrystals()
       );
    }
 
    public static int getCrystalsAfterDeath(Player player) {
-      float healthDifference =  player.getMaxHealth() - MathUtils.clamp((int) EvalVars.apply(player, getMechanics().healthOnDeath.get()), minHealth(), maxHealth());
+      float healthDifference =  player.getMaxHealth() - Mth.clamp((int) EvalVars.apply(player, getMechanics().healthOnDeath.get()), minHealth(), maxHealth());
       int crystalDifference = (int) healthDifference / (2 * SHItems.heartCrystalIncreaseAmount());
       return getPlayerData(player).getHeartCrystals() - crystalDifference;
    }

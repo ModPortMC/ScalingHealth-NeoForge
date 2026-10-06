@@ -1,23 +1,29 @@
 package net.silentchaos512.scalinghealth.datagen;
 
-import net.minecraft.data.DataGenerator;
-import net.minecraftforge.data.event.GatherDataEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.neoforge.data.event.GatherDataEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 import net.silentchaos512.scalinghealth.ScalingHealth;
 
-@Mod.EventBusSubscriber(modid = ScalingHealth.MOD_ID ,bus = Mod.EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = ScalingHealth.MOD_ID)
 public class GenEvent {
     @SubscribeEvent
-    public static void gatherData(GatherDataEvent event) {
-        DataGenerator generator = event.getGenerator();
-        generator.addProvider(true, new Recipes(generator));
-        generator.addProvider(true, new LootTablesGen(event));
-        generator.addProvider(true, new SHEntityTagsProvider(event));
-        generator.addProvider(true, new SHBlockTagsProvider(event));
-        generator.addProvider(true, new LootModifierGen(event.getGenerator()));
-        generator.addProvider(true, new EnglishLocalization(event.getGenerator()));
-        generator.addProvider(true, new BlockStateGen(event));
-        generator.addProvider(true, new WorldGenGenerator(event));
+    public static void gatherServerData(GatherDataEvent.Server event) {
+        var output = event.getGenerator().getPackOutput();
+        event.createDatapackRegistryObjects(WorldGenGenerator.BUILDER);
+        var lookupProvider = event.getLookupProvider();
+
+        event.addProvider(new Recipes(output, lookupProvider));
+        event.addProvider(new LootTablesGen(output, lookupProvider));
+        event.addProvider(new SHEntityTagsProvider(output, lookupProvider));
+        event.addProvider(new SHBlockTagsProvider(output, lookupProvider));
+        event.addProvider(new LootModifierGen(output, lookupProvider));
+    }
+
+    @SubscribeEvent
+    public static void gatherClientData(GatherDataEvent.Client event) {
+        var output = event.getGenerator().getPackOutput();
+        event.addProvider(new EnglishLocalization(output));
+        event.addProvider(new BlockStateGen(output));
     }
 }

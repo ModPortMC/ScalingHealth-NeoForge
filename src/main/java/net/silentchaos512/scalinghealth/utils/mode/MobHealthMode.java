@@ -22,7 +22,7 @@ public class MobHealthMode {
     }
 
     public double getModifierHealth(double healthBoost, double baseMaxHp) {
-        if (this.op == AttributeModifier.Operation.ADDITION)
+        if (this.op == AttributeModifier.Operation.ADD_VALUE)
             return healthBoost;
 
         double healthScale = this.scaleReduction * Math.max(0, baseMaxHp - 20);

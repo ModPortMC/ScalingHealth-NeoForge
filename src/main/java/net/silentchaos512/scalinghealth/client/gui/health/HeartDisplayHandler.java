@@ -18,39 +18,37 @@
 
 package net.silentchaos512.scalinghealth.client.gui.health;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.player.Player;
-import net.minecraftforge.client.event.RenderGuiOverlayEvent;
-import net.minecraftforge.client.gui.overlay.ForgeGui;
-import net.minecraftforge.client.gui.overlay.VanillaGuiOverlay;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
+import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 import net.silentchaos512.lib.event.ClientTicks;
 import net.silentchaos512.scalinghealth.ScalingHealth;
 import net.silentchaos512.scalinghealth.client.gui.TextureSlice;
 import net.silentchaos512.scalinghealth.config.SHConfig;
-import net.silentchaos512.utils.Color;
-import net.silentchaos512.utils.MathUtils;
+import net.silentchaos512.lib.util.Color;
+import net.silentchaos512.lib.util.MathUtils;
 
 import java.util.List;
+import org.joml.Matrix3x2fStack;
 
 /**
  * Handles display of regular and absorption hearts.
- * Much of the code can be found in {@link net.minecraftforge.client.gui.overlay.ForgeGui}.
+ * The custom heart layer replaces the vanilla player-health layer when enabled.
  */
-public final class HeartDisplayHandler extends Screen {
-    public static final HeartDisplayHandler INSTANCE = new HeartDisplayHandler(Component.empty());
+public final class HeartDisplayHandler {
+    public static final HeartDisplayHandler INSTANCE = new HeartDisplayHandler();
 
-    private static final float COLOR_CHANGE_PERIOD = 150;
-    private static final ResourceLocation TEXTURE = new ResourceLocation(ScalingHealth.MOD_ID, "textures/gui/hud.png");
+    private static final int COLOR_CHANGE_PERIOD = 150;
+    private static final Identifier TEXTURE = Identifier.fromNamespaceAndPath(
+            ScalingHealth.MOD_ID, "textures/gui/hud.png");
 
     private static final TextureSlice TANK_SHINE = new TextureSlice(TEXTURE, 44, 0, 5, 5);
     private static final TextureSlice TANK_OUTLINE = new TextureSlice(TEXTURE,44, 5, 5, 5);
@@ -59,75 +57,60 @@ public final class HeartDisplayHandler extends Screen {
 
     private final HeartsInfo info = new HeartsInfo();
 
-    private HeartDisplayHandler(Component title) {
-        super(title);
+    private HeartDisplayHandler() {}
+
+    public static void registerGuiLayer(RegisterGuiLayersEvent event) {
+        event.wrapLayer(VanillaGuiLayers.PLAYER_HEALTH, vanillaLayer -> (graphics, deltaTracker) -> {
+            if (INSTANCE.info.heartStyle.get() == HeartIconStyle.VANILLA) {
+                vanillaLayer.render(graphics, deltaTracker);
+                return;
+            }
+
+            Minecraft mc = Minecraft.getInstance();
+            Player player = mc.player;
+            if (player == null || mc.options.hideGui || mc.gameMode == null || !mc.gameMode.canHurtPlayer()) {
+                return;
+            }
+
+            INSTANCE.renderHearts(graphics, mc, player);
+            if (mc.gameMode.getPlayerMode().isSurvival()) {
+                INSTANCE.renderHealthText(graphics, mc, player);
+            }
+        });
     }
 
-    @SubscribeEvent(receiveCanceled = true)
-    public void onHealthBar(RenderGuiOverlayEvent.Post event) {
-        if (event.getOverlay() != VanillaGuiOverlay.PLAYER_HEALTH.type()) return;
-        
-        if (info.heartStyle.get() == HeartIconStyle.VANILLA) return;
-
-        Minecraft mc = Minecraft.getInstance();
-        Player player = mc.player;
-
-        // Health text
-        if (mc.gameMode.getPlayerMode().isSurvival()) {
-            // Draw health string?
-            if (SHConfig.CLIENT.healthTextStyle.get() != HealthTextStyle.DISABLED) {
-                mc.getProfiler().push("scalinghealthRenderHealthText");
-                renderHealthText(mc, event.getGuiGraphics(), info.health, info.maxHealth,
-                        -91 + SHConfig.CLIENT.healthTextOffsetX.get(),
-                        -38 + SHConfig.CLIENT.healthTextOffsetY.get(),
-                        SHConfig.CLIENT.healthTextStyle.get(),
-                        SHConfig.CLIENT.healthTextColorStyle.get());
-                mc.getProfiler().pop();
-            }
-            // Draw absorption amount string?
-            if (SHConfig.CLIENT.absorptionTextStyle.get() != HealthTextStyle.DISABLED && player.getAbsorptionAmount() > 0) {
-                mc.getProfiler().push("scalinghealthRenderAbsorptionText");
-                renderHealthText(mc, event.getGuiGraphics(), player.getAbsorptionAmount(), 0,
-                        -91 + SHConfig.CLIENT.absorptionTextOffsetX.get(),
-                        -49 + SHConfig.CLIENT.absorptionTextOffsetY.get(),
-                        SHConfig.CLIENT.absorptionTextStyle.get(),
-                        HealthTextColor.SOLID);
-                mc.getProfiler().pop();
-            }
+    private void renderHealthText(GuiGraphicsExtractor graphics, Minecraft mc, Player player) {
+        if (SHConfig.CLIENT.healthTextStyle.get() != HealthTextStyle.DISABLED) {
+            renderHealthText(mc, graphics, info.health, info.maxHealth,
+                    -91 + SHConfig.CLIENT.healthTextOffsetX.get(),
+                    -38 + SHConfig.CLIENT.healthTextOffsetY.get(),
+                    SHConfig.CLIENT.healthTextStyle.get(),
+                    SHConfig.CLIENT.healthTextColorStyle.get());
+        }
+        if (SHConfig.CLIENT.absorptionTextStyle.get() != HealthTextStyle.DISABLED && player.getAbsorptionAmount() > 0) {
+            renderHealthText(mc, graphics, player.getAbsorptionAmount(), 0,
+                    -91 + SHConfig.CLIENT.absorptionTextOffsetX.get(),
+                    -49 + SHConfig.CLIENT.absorptionTextOffsetY.get(),
+                    SHConfig.CLIENT.absorptionTextStyle.get(),
+                    HealthTextColor.SOLID);
         }
     }
 
-    @SubscribeEvent(receiveCanceled = true)
-    public void onHealthDraw(RenderGuiOverlayEvent.Pre event) {
-        if (event.getOverlay() != VanillaGuiOverlay.PLAYER_HEALTH.type() ||
-                info.heartStyle.get() == HeartIconStyle.VANILLA ||
-                Minecraft.getInstance().options.hideGui ||
-                !getGui().shouldDrawSurvivalElements()
-        )
-            return;
-
-        Minecraft mc = Minecraft.getInstance();
-        Player player = mc.player;
-
-        event.setCanceled(true);
-        mc.getProfiler().push("scalinghealthRenderHearts");
-        renderHearts(event, mc, player);
-        mc.getProfiler().pop();
+    private void renderHearts(GuiGraphicsExtractor graphics, Minecraft mc, Player player) {
+        renderHeartsInternal(graphics, mc, player);
     }
 
-    private void renderHearts(RenderGuiOverlayEvent event, Minecraft mc, Player player) {
-        GuiGraphics graphics = event.getGuiGraphics();
+    private void renderHeartsInternal(GuiGraphicsExtractor graphics, Minecraft mc, Player player) {
         info.update();
-
-        RenderSystem.enableBlend();
 
         float absorb = Mth.ceil(player.getAbsorptionAmount());
 
         final int left = info.scaledWindowWidth / 2 - 91;
-        int top = info.scaledWindowHeight - getGui().leftHeight;
-        getGui().leftHeight += info.rowsUsedInHud * info.rowHeight;
+        Gui gui = mc.gui;
+        int top = info.scaledWindowHeight - gui.leftHeight;
+        gui.leftHeight += info.rowsUsedInHud * info.rowHeight;
         if (info.rowHeight != 10)
-            getGui().leftHeight += 10 - info.rowHeight;
+            gui.leftHeight += 10 - info.rowHeight;
 
         // Draw vanilla hearts
         drawVanillaHearts(graphics, left, top);
@@ -135,7 +118,6 @@ public final class HeartDisplayHandler extends Screen {
         int potionOffset = info.hardcoreMode ? 27 : 0;
 
         // Draw extra hearts (only top 2 rows)
-        RenderSystem.setShaderTexture(0, TEXTURE);
         int rowCount = info.getCustomHeartRowCount(info.healthInt);
         int maxHealthRows = info.getCustomHeartRowCount((int) player.getMaxHealth());
 
@@ -194,7 +176,7 @@ public final class HeartDisplayHandler extends Screen {
                 int allTanksInRow = info.getAllHeartTanksInRow(row);
                 int rowColor = getColorForRow(row, false);
                 top -= 4;
-                getGui().leftHeight += 4;
+                mc.gui.leftHeight += 4;
 
                 // Draw tanks
                 int x;
@@ -274,7 +256,7 @@ public final class HeartDisplayHandler extends Screen {
         }
     }
 
-    private void drawVanillaHearts(GuiGraphics graphics, int left, int top) {
+    private void drawVanillaHearts(GuiGraphicsExtractor graphics, int left, int top) {
         int textureX = info.recentlyHurtHighlight ? 25 : 16;
         int textureY = 9 * (info.hardcoreMode ? 5 : 0);
         int margin = 16;
@@ -289,85 +271,81 @@ public final class HeartDisplayHandler extends Screen {
             int x = left + i % 10 * 8;
             int y = info.offsetHeartPosY(i, top - row * info.rowHeight);
 
-            graphics.blit(TEXTURE, x, y, textureX, textureY, 9, 9);
+            blitWithColor(graphics, x, y, textureX, textureY, 9, 9, 0xFFFFFFFF);
 
             if (info.recentlyHurtHighlight) {
                 if (i * 2 + 1 < info.previousHealthInt)
-                    graphics.blit(TEXTURE, x, y, margin + 54, textureY, 9, 9);
+                    blitWithColor(graphics, x, y, margin + 54, textureY, 9, 9, 0xFFFFFFFF);
                 else if (i * 2 + 1 == info.previousHealthInt)
-                    graphics.blit(TEXTURE, x, y, margin + 63, textureY, 9, 9);
+                    blitWithColor(graphics, x, y, margin + 63, textureY, 9, 9, 0xFFFFFFFF);
             }
 
             if (absorbRemaining > 0f && info.absorptionStyle.get() == AbsorptionIconStyle.VANILLA) {
                 if (MathUtils.doublesEqual(absorbRemaining, info.absorption) && MathUtils.doublesEqual(info.absorption % 2f, 1f)) {
-                    graphics.blit(TEXTURE, x, y, margin + 153, textureY, 9, 9);
+                    blitWithColor(graphics, x, y, margin + 153, textureY, 9, 9, 0xFFFFFFFF);
                     absorbRemaining -= 1f;
                 } else {
                     if (i * 2 + 1 < healthTotal)
-                        graphics.blit(TEXTURE, x, y, margin + 144, textureY, 9, 9);
+                        blitWithColor(graphics, x, y, margin + 144, textureY, 9, 9, 0xFFFFFFFF);
                     absorbRemaining -= 2f;
                 }
             } else {
                 if (i * 2 + 1 < info.healthInt)
-                    graphics.blit(TEXTURE,x, y, margin + 36, textureY, 9, 9);
+                    blitWithColor(graphics, x, y, margin + 36, textureY, 9, 9, 0xFFFFFFFF);
                 else if (i * 2 + 1 == info.healthInt)
-                    graphics.blit(TEXTURE,x, y, margin + 45, textureY, 9, 9);
+                    blitWithColor(graphics, x, y, margin + 45, textureY, 9, 9, 0xFFFFFFFF);
             }
         }
     }
 
-    private void renderHealthText(Minecraft mc, GuiGraphics graphics, float current, float max, int offsetX, int offsetY, HealthTextStyle style, HealthTextColor styleColor) {
+    private void renderHealthText(Minecraft mc, GuiGraphicsExtractor graphics, float current, float max, int offsetX, int offsetY, HealthTextStyle style, HealthTextColor styleColor) {
         final float scale = (float) style.getScale();
         final int left = (int) ((info.scaledWindowWidth / 2 + offsetX) / scale);
-        // GuiIngameForge.leftHeight == 59 in normal cases. Making it a constant should fix some issues.
+        // The target health layer places the text at the same baseline used by the former Forge HUD.
         final int top = (int) ((info.scaledWindowHeight + offsetY + (1 / scale)) / scale);
 
         // Draw health string
-        mc.getProfiler().push("shTextPreDraw");
         String healthString = style.textFor(current, max);
-        Font fontRenderer = Minecraft.getInstance().font;
+        Font fontRenderer = mc.font;
         int stringWidth = fontRenderer.width(healthString);
         int color;
         float divisor = max == 0 ? current : max;
+        float healthFraction = divisor == 0
+                ? 0
+                : MathUtils.clamp(current / divisor, 0f, 1f);
         switch (styleColor) {
             case TRANSITION:
 //                color = Color.HSBtoRGB(0.34f * current / divisor, 0.7f, 1.0f);
                 color = Color.blend(
                         SHConfig.CLIENT.healthTextEmptyColor.get(),
                         SHConfig.CLIENT.healthTextFullColor.get(),
-                        current / divisor);
+                        healthFraction);
                 break;
             case PSYCHEDELIC:
                 color = java.awt.Color.HSBtoRGB(
-                        (ClientTicks.ticksInGame() % COLOR_CHANGE_PERIOD) / COLOR_CHANGE_PERIOD,
-                        0.55f * current / divisor, 1.0f);
+                        Math.floorMod(ClientTicks.ticksInGame(), COLOR_CHANGE_PERIOD) / (float) COLOR_CHANGE_PERIOD,
+                        0.55f * healthFraction, 1.0f);
                 break;
             case SOLID:
             default:
                 color = SHConfig.CLIENT.healthTextFullColor.get();
                 break;
         }
-        mc.getProfiler().pop();
-
-        mc.getProfiler().push("shTextDraw");
-        PoseStack stack = graphics.pose();
-        stack.pushPose();
-        stack.scale(scale, scale, 1);
-        graphics.drawString(font, healthString, left - stringWidth - 2, top, color);
-        stack.popPose();
-        mc.getProfiler().pop();
+        Matrix3x2fStack pose = graphics.pose();
+        pose.pushMatrix();
+        pose.scale(scale, scale);
+        graphics.text(fontRenderer, healthString, left - stringWidth - 2, top, toArgb(color));
+        pose.popMatrix();
     }
 
-    private void blitWithColor(GuiGraphics graphics, int x, int y, int textureX, int textureY, int width, int height, int color) {
-        float a = ((color >> 24) & 255) / 255f;
-        if (a <= 0f)
-            a = 1f;
-        float r = ((color >> 16) & 255) / 255f;
-        float g = ((color >> 8) & 255) / 255f;
-        float b = (color & 255) / 255f;
-        graphics.setColor(r, g, b, a);
-        graphics.blit(TEXTURE, x, y, textureX, textureY, width, height);
-        graphics.setColor(1, 1, 1, 1);
+    private void blitWithColor(GuiGraphicsExtractor graphics, int x, int y, int textureX, int textureY, int width, int height, int color) {
+        int argb = toArgb(color);
+        graphics.blit(RenderPipelines.GUI_TEXTURED, TEXTURE, x, y, textureX, textureY,
+                width, height, 256, 256, argb);
+    }
+
+    private static int toArgb(int color) {
+        return (color >>> 24) == 0 ? 0xFF000000 | color : color;
     }
 
     private static int getColorForRow(int row, boolean absorption) {
@@ -390,7 +368,4 @@ public final class HeartDisplayHandler extends Screen {
         return 0xFFFFFF;
     }
 
-    public static ForgeGui getGui() {
-        return (ForgeGui) Minecraft.getInstance().gui;
-    }
 }

@@ -6,10 +6,12 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.udojava.evalex.Expression;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.Holder;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraftforge.registries.ForgeRegistries;
 import net.silentchaos512.scalinghealth.utils.mode.AreaDifficultyMode;
 import net.silentchaos512.scalinghealth.utils.mode.AreaDifficultyModes;
 import net.silentchaos512.scalinghealth.utils.serialization.SerializationUtils;
@@ -25,13 +27,13 @@ import java.util.stream.Collectors;
 public class DifficultyMechanics {
     public static final String FILE = "difficulty";
 
-    public static final Codec<DifficultyMechanics> CODEC = RecordCodecBuilder.create(inst ->
+    public static final Codec<DifficultyMechanics> CODEC = RecordCodecBuilder.<DifficultyMechanics>create(inst ->
             inst.group(
                     SerializationUtils.numberConstraintCodec(
                           Codec.DOUBLE, "startingValue",
                           Codec.DOUBLE, "minValue",
                           Codec.DOUBLE, "maxValue"
-                    ).forGetter(d -> new SerializationUtils.NumberConstraint<>(d.starting, d.minValue, d.maxValue)),
+                    ).forGetter((DifficultyMechanics d) -> new SerializationUtils.NumberConstraint<Double, Double, Double>(d.starting, d.minValue, d.maxValue)),
                     Codec.DOUBLE.fieldOf("changePerSecond").forGetter(d -> d.changePerSecond),
                     AreaDifficultyMode.CODEC.fieldOf("mode").forGetter(d -> d.mode),
                     SerializationUtils.EXPRESSION_CODEC.fieldOf("groupBonus").forGetter(d -> d.groupBonus),
@@ -120,8 +122,8 @@ public class DifficultyMechanics {
                         Codec.mapPair( //nested pairs to act as triple
                                 SerializationUtils.positiveDouble().fieldOf("scale"),
                                 Codec.mapPair(
-                                        ResourceLocation.CODEC.listOf().optionalFieldOf("biomes", Collections.emptyList()),
-                                        ResourceLocation.CODEC.listOf().optionalFieldOf("dimensions", Collections.emptyList())
+                                        Identifier.CODEC.listOf().optionalFieldOf("biomes", Collections.emptyList()),
+                                        Identifier.CODEC.listOf().optionalFieldOf("dimensions", Collections.emptyList())
                                 )
                         ).codec().listOf().fieldOf("locationMultipliers").forGetter(m -> m.locationMultipliers)
                 ).apply(inst, Multipliers::new)
@@ -129,12 +131,12 @@ public class DifficultyMechanics {
 
 
         private final List<Double> lunarMultipliers;
-        private final List<Pair<Double, Pair<List<ResourceLocation>, List<ResourceLocation>>>> locationMultipliers;
-        private final List<ResourceLocation> biomes;
-        private final List<ResourceLocation> dimensions;
-        private final Map<Pair<Level, Biome>, Double> scaleMap = new HashMap<>();
+        private final List<Pair<Double, Pair<List<Identifier>, List<Identifier>>>> locationMultipliers;
+        private final List<Identifier> biomes;
+        private final List<Identifier> dimensions;
+        private final Map<Pair<Level, Holder<Biome>>, Double> scaleMap = new HashMap<>();
 
-        public Multipliers(List<Double> lunarMultipliers, List<Pair<Double, Pair<List<ResourceLocation>, List<ResourceLocation>>>> locationMultipliers) {
+        public Multipliers(List<Double> lunarMultipliers, List<Pair<Double, Pair<List<Identifier>, List<Identifier>>>> locationMultipliers) {
             this.lunarMultipliers = lunarMultipliers;
             this.locationMultipliers = locationMultipliers;
             this.biomes = locationMultipliers.stream().flatMap(l -> l.getSecond().getFirst().stream()).collect(Collectors.toList());
@@ -145,13 +147,14 @@ public class DifficultyMechanics {
             return lunarMultipliers.isEmpty() ? 1 : lunarMultipliers.get(phase);
         }
 
-        public double getScale(Level world, Biome biome) {
-            Pair<Level, Biome> p = new Pair<>(world, biome);
+        public double getScale(Level world, Holder<Biome> biome) {
+            Pair<Level, Holder<Biome>> p = new Pair<>(world, biome);
             if (scaleMap.containsKey(p))
                 return scaleMap.get(p);
 
-            ResourceLocation dim = world.dimension().location();
-            if (!dimensions.contains(dim) && !biomes.contains(ForgeRegistries.BIOMES.getKey(biome))) {
+            Identifier dim = world.dimension().identifier();
+            Identifier biomeId = biome.unwrapKey().map(ResourceKey::identifier).orElse(null);
+            if (!dimensions.contains(dim) && !biomes.contains(biomeId)) {
                 scaleMap.put(p, 1D);
                 return 1D;
             }
@@ -161,9 +164,9 @@ public class DifficultyMechanics {
         }
 
         //Check the scales that have specified both a dimension and a biome.
-        private double biomeAndDimMatch(Level w, Biome b) {
-            ResourceLocation biome = ForgeRegistries.BIOMES.getKey(b);
-            ResourceLocation dim = w.dimension().location();
+        private double biomeAndDimMatch(Level w, Holder<Biome> b) {
+            Identifier biome = b.unwrapKey().map(ResourceKey::identifier).orElse(null);
+            Identifier dim = w.dimension().identifier();
             return locationMultipliers.stream()
                     .filter(p -> p.getSecond().getFirst().contains(biome))
                     .filter(p -> p.getSecond().getSecond().contains(dim))
@@ -173,8 +176,8 @@ public class DifficultyMechanics {
         }
 
         //Check the scales that only have a biome specified
-        private double biomeMatch(Biome b) {
-            ResourceLocation biome = ForgeRegistries.BIOMES.getKey(b);
+        private double biomeMatch(Holder<Biome> b) {
+            Identifier biome = b.unwrapKey().map(ResourceKey::identifier).orElse(null);
             return locationMultipliers.stream()
                     .filter(p -> p.getSecond().getFirst().contains(biome))
                     .filter(p -> p.getSecond().getSecond().isEmpty())
@@ -185,7 +188,7 @@ public class DifficultyMechanics {
 
         //Check the scales that only have a dimension specified
         private double dimMatch(Level w) {
-            ResourceLocation dim = w.dimension().location();
+            Identifier dim = w.dimension().identifier();
             return locationMultipliers.stream()
                     .filter(p -> p.getSecond().getSecond().contains(dim))
                     .filter(p -> p.getSecond().getFirst().isEmpty())
@@ -201,11 +204,11 @@ public class DifficultyMechanics {
                            Supplier<Expression> onPlayerKilled,
                            Supplier<Expression> onPlayerDeath,
                            Supplier<Expression> onPlayerSleep,
-                           List<Pair<List<ResourceLocation>, Supplier<Expression>>> byEntity) {
-        private static final Function<ResourceLocation, DataResult<ResourceLocation>> ONLY_ENTITES = rl ->
-                ForgeRegistries.ENTITY_TYPES.containsKey(rl) ? DataResult.success(rl) : DataResult.error(() -> rl + " is not an entity!");
+                           List<Pair<List<Identifier>, Supplier<Expression>>> byEntity) {
+        private static final Function<Identifier, DataResult<Identifier>> ONLY_ENTITES = id ->
+                BuiltInRegistries.ENTITY_TYPE.containsKey(id) ? DataResult.success(id) : DataResult.error(() -> id + " is not an entity!");
 
-        public static final Codec<Mutators> CODEC = RecordCodecBuilder.create(inst ->
+        public static final Codec<Mutators> CODEC = RecordCodecBuilder.<Mutators>create(inst ->
                 inst.group(
                         SerializationUtils.EXPRESSION_CODEC.fieldOf("onBlightKilled").forGetter(m -> m.onBlightKilled),
                         SerializationUtils.EXPRESSION_CODEC.fieldOf("onHostileKilled").forGetter(m -> m.onHostileKilled),
@@ -214,7 +217,7 @@ public class DifficultyMechanics {
                         SerializationUtils.EXPRESSION_CODEC.fieldOf("onPlayerDeath").forGetter(m -> m.onPlayerDeath),
                         SerializationUtils.EXPRESSION_CODEC.fieldOf("onPlayerSleep").forGetter(m -> m.onPlayerSleep),
                         Codec.mapPair(
-                                ResourceLocation.CODEC.flatXmap(ONLY_ENTITES, ONLY_ENTITES).listOf().fieldOf("entities"),
+                                Identifier.CODEC.flatXmap(ONLY_ENTITES, ONLY_ENTITES).listOf().fieldOf("entities"),
                                 SerializationUtils.EXPRESSION_CODEC.fieldOf("onKilled")
                         ).codec().listOf().fieldOf("byEntity").forGetter(m -> m.byEntity)
                 ).apply(inst, Mutators::new)

@@ -1,16 +1,18 @@
 package net.silentchaos512.scalinghealth.datagen;
 
 import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
 import net.minecraft.data.tags.EntityTypeTagsProvider;
-import net.minecraftforge.data.event.GatherDataEvent;
 import net.silentchaos512.scalinghealth.ScalingHealth;
 import net.silentchaos512.scalinghealth.resources.tags.EntityTags;
+
+import java.util.concurrent.CompletableFuture;
 
 import static net.minecraft.world.entity.EntityType.*;
 
 public class SHEntityTagsProvider extends EntityTypeTagsProvider {
-   public SHEntityTagsProvider(GatherDataEvent event) {
-      super(event.getGenerator().getPackOutput(), event.getLookupProvider(), ScalingHealth.MOD_ID, event.getExistingFileHelper());
+   public SHEntityTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider) {
+      super(output, lookupProvider, ScalingHealth.MOD_ID);
    }
 
    @Override

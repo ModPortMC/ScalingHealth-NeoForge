@@ -18,52 +18,40 @@
 
 package net.silentchaos512.scalinghealth.objects.potion;
 
-import com.google.common.collect.ImmutableList;
+import net.minecraft.resources.Identifier;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.attributes.AttributeModifier;
-import net.minecraft.world.item.ItemStack;
-import net.silentchaos512.lib.util.EntityHelper;
-
-import java.util.List;
+import net.silentchaos512.scalinghealth.ScalingHealth;
 
 public class BandagedEffect extends MobEffect {
     private static final float BASE_HEAL_RATE = 0.005f;
     public static final double SPEED_MODIFIER = -0.25;
-    public static final String MOD_UUID = "732486d8-f730-41a2-868f-eb988738986f";
+    // Preserve the old stable UUID value as the target namespaced modifier ID.
+    public static final Identifier MODIFIER_ID = Identifier.fromNamespaceAndPath(ScalingHealth.MOD_ID, "732486d8-f730-41a2-868f-eb988738986f");
 
     public BandagedEffect(MobEffectCategory type, int color) {
         super(type, color);
     }
 
     @Override
-    public void applyEffectTick(LivingEntity entityLiving, int amplifier) {
+    public boolean applyEffectTick(ServerLevel level, LivingEntity entityLiving, int amplifier) {
         // Remove effect if fully healed.
         if (entityLiving.getHealth() >= entityLiving.getMaxHealth()) {
-            entityLiving.removeEffect(this);
+            entityLiving.removeEffect(BuiltInRegistries.MOB_EFFECT.wrapAsHolder(this));
         }
 
         float healAmount = BASE_HEAL_RATE * entityLiving.getMaxHealth() * (amplifier + 1);
-        // Using Entity#heal allows us to prevent the cancelable LivingHealEvent from being fired.
-        EntityHelper.heal(entityLiving, healAmount, true);
+        // Preserve the removed helper's call to LivingEntity#heal, including its heal-event behavior.
+        entityLiving.heal(healAmount);
+        return true;
     }
 
     @Override
-    public boolean isDurationEffectTick(int duration, int amplifier) {
+    public boolean shouldApplyEffectTickThisTick(int tickCount, int amplifier) {
         // Heal every second.
-        return duration % 20 == 0;
-    }
-
-    @Override
-    public List<ItemStack> getCurativeItems() {
-        // Milk doesn't melt bandages off... right?
-        return ImmutableList.of();
-    }
-
-    @Override
-    public double getAttributeModifierValue(int amplifier, AttributeModifier modifier) {
-        // I don't want to consider the amplifier.
-        return modifier.getAmount();
+        return tickCount % 20 == 0;
     }
 }

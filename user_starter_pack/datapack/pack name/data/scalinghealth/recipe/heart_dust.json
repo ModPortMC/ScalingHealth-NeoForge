@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "group": "scalinghealth",
+  "ingredients": [
+    {
+      "item": "scalinghealth:heart_crystal"
+    }
+  ],
+  "result": {
+    "count": 24,
+    "id": "scalinghealth:heart_dust"
+  },
+  "key": {}
+}

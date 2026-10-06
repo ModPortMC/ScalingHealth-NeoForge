@@ -41,3 +41,6 @@ secret.json
 src/generated/resources/.cache/
 
 logs/
+
+# Host migration and verification state is not part of this source release.
+.modport/

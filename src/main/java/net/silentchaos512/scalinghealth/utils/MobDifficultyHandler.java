@@ -2,7 +2,8 @@ package net.silentchaos512.scalinghealth.utils;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
@@ -10,19 +11,16 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.monster.Enemy;
-import net.minecraftforge.network.PacketDistributor;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.silentchaos512.scalinghealth.ScalingHealth;
 import net.silentchaos512.scalinghealth.capability.IDifficultyAffected;
 import net.silentchaos512.scalinghealth.event.BlightHandler;
 import net.silentchaos512.scalinghealth.event.CommonEvents;
 import net.silentchaos512.scalinghealth.network.ClientBlightMessage;
-import net.silentchaos512.scalinghealth.network.Network;
 import net.silentchaos512.scalinghealth.utils.config.EnabledFeatures;
 import net.silentchaos512.scalinghealth.utils.config.SHDifficulty;
 import net.silentchaos512.scalinghealth.utils.config.SHMobs;
 import net.silentchaos512.scalinghealth.utils.mode.MobHealthMode;
-import net.silentchaos512.utils.MathUtils;
 
 public final class MobDifficultyHandler {
     private MobDifficultyHandler() {}
@@ -38,7 +36,7 @@ public final class MobDifficultyHandler {
         double chance = getBlightChance(difficulty);
         if(chance == 1)    return true;
 
-        return MathUtils.tryPercentage(ScalingHealth.RANDOM, chance);
+        return ScalingHealth.RANDOM.nextDouble() < chance;
     }
 
     private static double getBlightChance(float difficulty) {
@@ -53,7 +51,7 @@ public final class MobDifficultyHandler {
         if (makeBlight) {
             data.setIsBlight(true);
             ClientBlightMessage msg = new ClientBlightMessage(entity.getId());
-            Network.channel.send(PacketDistributor.TRACKING_ENTITY.with(()->entity), msg);
+            PacketDistributor.sendToPlayersTrackingEntity(entity, msg);
 
             BlightHandler.applyBlightPotionEffects(entity);
             //TODO no good in code method for determining if an entity is a boss or not, switch to tag?
@@ -104,9 +102,9 @@ public final class MobDifficultyHandler {
                 damageBoost = Mth.clamp(damageBoost, 0, max);
             }
 
-            ResourceLocation loc = ForgeRegistries.ENTITY_TYPES.getKey(entity.getType());
+            Identifier loc = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
             if (loc != null && !SHDifficulty.getDamageBlacklistedMods().contains(loc.getNamespace()))
-                ModifierHandler.addAttackDamage(entity, damageBoost, AttributeModifier.Operation.ADDITION);
+                ModifierHandler.addAttackDamage(entity, damageBoost, AttributeModifier.Operation.ADD_VALUE);
         }
     }
 }

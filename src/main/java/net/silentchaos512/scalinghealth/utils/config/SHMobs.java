@@ -17,7 +17,7 @@ public final class SHMobs {
     } 
 
     public static boolean allowsDifficultyChanges(Mob entity) {
-        return !entity.getType().is(EntityTags.DIFFICULTY_EXEMPT);
+        return !entity.getType().builtInRegistryHolder().is(EntityTags.DIFFICULTY_EXEMPT);
     }
 
     public static double blightChance() {
@@ -25,7 +25,8 @@ public final class SHMobs {
     }
 
     public static boolean canBecomeBlight(Mob entity) {
-        return EnabledFeatures.blightsEnabled() && !entity.getType().is(EntityTags.BLIGHT_EXEMPT);
+        return EnabledFeatures.blightsEnabled()
+                && !entity.getType().builtInRegistryHolder().is(EntityTags.BLIGHT_EXEMPT);
     }
 
     public static boolean isBlight(Mob entity) {

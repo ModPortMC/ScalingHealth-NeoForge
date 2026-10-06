@@ -1,17 +1,17 @@
 package net.silentchaos512.scalinghealth.config;
 
 import com.google.common.collect.ImmutableList;
-import net.minecraftforge.common.ForgeConfigSpec;
-import net.minecraftforge.common.ForgeConfigSpec.*;
-import net.minecraftforge.fml.ModLoadingContext;
-import net.minecraftforge.fml.config.ModConfig;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.config.ModConfig;
+import net.neoforged.neoforge.common.ModConfigSpec;
+import net.neoforged.neoforge.common.ModConfigSpec.*;
 import net.silentchaos512.scalinghealth.client.gui.difficulty.DifficultyMeterShow;
 import net.silentchaos512.scalinghealth.client.gui.health.AbsorptionIconStyle;
 import net.silentchaos512.scalinghealth.client.gui.health.HealthTextColor;
 import net.silentchaos512.scalinghealth.client.gui.health.HealthTextStyle;
 import net.silentchaos512.scalinghealth.client.gui.health.HeartIconStyle;
-import net.silentchaos512.utils.Anchor;
-import net.silentchaos512.utils.Color;
+import net.silentchaos512.lib.util.Anchor;
+import net.silentchaos512.lib.util.Color;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.function.Supplier;
@@ -330,25 +330,25 @@ public class SHConfig {
         }
     }
 
-    private static final ForgeConfigSpec CLIENT_SPEC;
-    private static final ForgeConfigSpec SERVER_SPEC;
+    private static final ModConfigSpec CLIENT_SPEC;
+    private static final ModConfigSpec SERVER_SPEC;
 
     public static final Client CLIENT;
     public static final Server SERVER;
 
     static {
-        Pair<Client, ForgeConfigSpec> pCli = new Builder().configure(Client::new);
+        Pair<Client, ModConfigSpec> pCli = new Builder().configure(Client::new);
         CLIENT_SPEC = pCli.getRight();
         CLIENT = pCli.getLeft();
 
-        Pair<Server, ForgeConfigSpec> pSev = new Builder().configure(Server::new);
+        Pair<Server, ModConfigSpec> pSev = new Builder().configure(Server::new);
         SERVER_SPEC = pSev.getRight();
         SERVER = pSev.getLeft();
     }
 
-    public static void register() {
-        ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, CLIENT_SPEC);
-        ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, SERVER_SPEC);
+    public static void register(ModContainer modContainer) {
+        modContainer.registerConfig(ModConfig.Type.CLIENT, CLIENT_SPEC);
+        modContainer.registerConfig(ModConfig.Type.SERVER, SERVER_SPEC);
     }
 
     private static boolean validateColor(Object o) {

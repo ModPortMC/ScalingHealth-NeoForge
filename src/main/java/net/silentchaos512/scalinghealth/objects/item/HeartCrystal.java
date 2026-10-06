@@ -21,13 +21,11 @@ package net.silentchaos512.scalinghealth.objects.item;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.entity.player.Player;
-import net.silentchaos512.lib.util.EntityHelper;
 import net.silentchaos512.scalinghealth.ScalingHealth;
 import net.silentchaos512.scalinghealth.objects.Registration;
 import net.silentchaos512.scalinghealth.utils.config.EnabledFeatures;
 import net.silentchaos512.scalinghealth.utils.config.SHItems;
 import net.silentchaos512.scalinghealth.utils.config.SHPlayers;
-import net.silentchaos512.utils.MathUtils;
 
 public class HeartCrystal extends StatBoosterItem {
     public HeartCrystal(Properties properties) {
@@ -55,9 +53,10 @@ public class HeartCrystal extends StatBoosterItem {
     protected void extraConsumeEffect(Player player) {
         int current = (int) player.getHealth();
         double healAmount = SHItems.heartCrystalHpBonusRegen();
-        EntityHelper.heal(player, (float) healAmount, true);
+        // Preserve the removed helper's heal-event behavior so cancellation remains visible below.
+        player.heal((float) healAmount);
         int newHealth = (int) player.getHealth();
-        if (!MathUtils.doublesEqual(current + healAmount, newHealth)) {
+        if (!(Math.abs(current + healAmount - newHealth) < 1.0E-6)) {
             ScalingHealth.LOGGER.warn("Another mod seems to have canceled healing from a heart container (player {})", player.getName());
         }
     }

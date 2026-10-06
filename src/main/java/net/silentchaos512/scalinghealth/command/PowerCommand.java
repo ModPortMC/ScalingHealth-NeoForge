@@ -23,8 +23,8 @@ public final class PowerCommand {
     private PowerCommand() {}
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext buildContext) {
-        LiteralArgumentBuilder<CommandSourceStack> builder = Commands.literal("sh_power").requires(source ->
-                source.hasPermission(2));
+        LiteralArgumentBuilder<CommandSourceStack> builder = Commands.literal("sh_power")
+                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS));
 
         // get
         builder

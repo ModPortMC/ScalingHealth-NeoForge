@@ -1,26 +1,26 @@
 package net.silentchaos512.scalinghealth.loot.conditions;
 
-import com.google.gson.JsonDeserializationContext;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonSerializationContext;
-import net.minecraft.core.Registry;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.GsonHelper;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.storage.loot.LootContext;
-import net.minecraft.world.level.storage.loot.Serializer;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
-import net.minecraft.world.level.storage.loot.predicates.LootItemConditionType;
 import net.silentchaos512.scalinghealth.ScalingHealth;
-import net.silentchaos512.scalinghealth.objects.Registration;
 import net.silentchaos512.scalinghealth.utils.EntityGroup;
 
 import java.util.Locale;
 
 public class EntityGroupCondition implements LootItemCondition {
-   public static final ResourceLocation NAME = new ResourceLocation(ScalingHealth.MOD_ID, "entity_group_condition");
+   public static final Identifier NAME = ScalingHealth.getId("entity_group_condition");
+
+   public static final MapCodec<EntityGroupCondition> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+           Codec.STRING.xmap(EntityGroup::from, group -> group.name().toLowerCase(Locale.ROOT))
+                   .fieldOf("entity_group").forGetter(condition -> condition.group)
+   ).apply(instance, EntityGroupCondition::new));
 
    private final EntityGroup group;
 
@@ -31,33 +31,19 @@ public class EntityGroupCondition implements LootItemCondition {
    /**
     * Tests the mob group of this mob, and tests that a damage source is present.
     *
-    * This is to prevent the associated modifier from being run if a creeper explodes for instance,
-    * as it triggers the loot table of the blocks it explodes. In that case THIS_ENTITY
-    * is present, but does not represent the loot table being triggered, this is problematic because the LootingLevelEvent
-    * is then fired but with a null damage source, which most mods assume to be non null (correctly?)
+    * This prevents a block loot table triggered by an explosion from being treated as
+    * a mob drop just because the loot context has a this-entity value.
     */
    @Override
    public boolean test(LootContext context) {
-      Entity entity = context.getParamOrNull(LootContextParams.THIS_ENTITY);
-      return context.hasParam(LootContextParams.DAMAGE_SOURCE) && entity instanceof LivingEntity &&
-              EntityGroup.from((LivingEntity) entity, true) == this.group;
+      Entity entity = context.getOptionalParameter(LootContextParams.THIS_ENTITY);
+      return context.hasParameter(LootContextParams.DAMAGE_SOURCE)
+              && entity instanceof LivingEntity living
+              && EntityGroup.from(living, true) == this.group;
    }
 
    @Override
-   public LootItemConditionType getType() {
-      return Registration.ENTITY_GROUP.get();
-   }
-
-   public static class ThisSerializer implements Serializer<EntityGroupCondition> {
-      @Override
-      public void serialize(JsonObject json, EntityGroupCondition condition, JsonSerializationContext context) {
-         json.addProperty("entity_group", condition.group.toString().toLowerCase(Locale.ROOT));
-      }
-
-      @Override
-      public EntityGroupCondition deserialize(JsonObject json, JsonDeserializationContext context) {
-         String group = GsonHelper.getAsString(json, "entity_group");
-         return new EntityGroupCondition(EntityGroup.from(group));
-      }
+   public MapCodec<EntityGroupCondition> codec() {
+      return CODEC;
    }
 }
