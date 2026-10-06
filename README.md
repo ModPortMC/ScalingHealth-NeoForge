@@ -2,7 +2,7 @@
 
 An unofficial NeoForge port of [SilentChaos512's Scaling Health](https://github.com/SilentChaos512/ScalingHealth).
 
-本项目由 **ModPort + dispatcher SDK 的全自动迁移工作流**将原版 Forge 1.20.1 Mod 迁移至 NeoForge 26.1.2。交付 JAR 已完成真实游戏环境中的目标行为测试：**29 个用例、64 个必需断言全部通过，0 失败、0 跳过**。
+本项目由 **ModPort + dispatcher SDK 的全自动迁移工作流**将原版 Forge 1.20.1 Mod 迁移至 NeoForge 26.1.2。交付 JAR 已完成真实游戏环境中的目标行为测试：**29 个用例、64 个必需断言全部通过。**
 
 The port was produced by **ModPort + [dispatcher SDK](https://github.com/FlightDan/dispatcher-sdk)** through an automated migration workflow. The delivered JAR passed **29 target behavior cases covering 64 required assertions**, with no failures or skipped cases: 2 GameTests and 27 cases in a shared client session.
 
